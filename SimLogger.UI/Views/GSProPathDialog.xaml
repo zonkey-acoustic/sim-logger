@@ -1,0 +1,110 @@
+<Window x:Class="SimLogger.UI.Views.GSProPathDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="GSPro Location"
+        Height="380" Width="550"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Style="{StaticResource MaterialDesignWindow}"
+        Background="{DynamicResource MaterialDesignPaper}"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="14"
+        FontFamily="{materialDesign:MaterialDesignFont}">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="GSPro Installation Location"
+                   Style="{StaticResource MaterialDesignHeadline6TextBlock}"
+                   Margin="0,0,0,8"/>
+
+        <!-- Description -->
+        <TextBlock Grid.Row="1"
+                   Text="Select the folder where GSPro is installed. Sim Logger reads shot data from the GSPro database (GSPro.db) in this folder."
+                   TextWrapping="Wrap"
+                   Opacity="0.7"
+                   Margin="0,0,0,16"/>
+
+        <!-- Path Selection -->
+        <Grid Grid.Row="2" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="PathTextBox"
+                     Grid.Column="0"
+                     IsReadOnly="True"
+                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                     materialDesign:HintAssist.Hint="GSPro Path"
+                     VerticalContentAlignment="Center"/>
+
+            <Button Grid.Column="1"
+                    Content="Browse..."
+                    Click="BrowseButton_Click"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Margin="8,0,0,0"/>
+        </Grid>
+
+        <!-- Status indicator -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8">
+            <materialDesign:PackIcon x:Name="StatusIcon"
+                                     Kind="CheckCircle"
+                                     Foreground="#4CAF50"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,8,0"/>
+            <TextBlock x:Name="StatusText"
+                       Text="Database found"
+                       Style="{StaticResource MaterialDesignBody2TextBlock}"
+                       VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Path info -->
+        <StackPanel Grid.Row="4" Orientation="Vertical" Margin="0,0,0,8">
+            <TextBlock x:Name="CurrentPathText"
+                       Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                       Opacity="0.5"
+                       TextWrapping="Wrap"
+                       TextTrimming="CharacterEllipsis"/>
+            <TextBlock x:Name="DatabasePathText"
+                       Style="{StaticResource MaterialDesignCaptionTextBlock}"
+                       Opacity="0.5"
+                       Margin="0,4,0,0"
+                       TextWrapping="Wrap"
+                       TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+
+        <!-- Spacer -->
+        <Grid Grid.Row="5"/>
+
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="6"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Auto-Detect"
+                    Click="AutoDetectButton_Click"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Margin="0,0,8,0"/>
+            <Button Content="Cancel"
+                    Click="CancelButton_Click"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="OkButton"
+                    Content="OK"
+                    Click="OkButton_Click"
+                    Style="{StaticResource MaterialDesignRaisedButton}"/>
+        </StackPanel>
+    </Grid>
+</Window>

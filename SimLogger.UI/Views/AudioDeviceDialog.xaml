@@ -1,0 +1,200 @@
+<Window x:Class="SimLogger.UI.Views.AudioDeviceDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Select Audio Device"
+        Height="300" Width="550"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Style="{StaticResource MaterialDesignWindow}"
+        Background="{DynamicResource MaterialDesignPaper}"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="14"
+        FontFamily="{materialDesign:MaterialDesignFont}">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="Select Audio Output Device"
+                   Style="{StaticResource MaterialDesignHeadline6TextBlock}"
+                   Margin="0,0,0,16"/>
+
+        <!-- Device List -->
+        <ListBox x:Name="DeviceListBox"
+                 Grid.Row="1"
+                 SelectionMode="Single"
+                 DisplayMemberPath="Name"
+                 Height="120"
+                 Margin="0,0,0,16"
+                 Style="{StaticResource MaterialDesignListBox}"/>
+
+        <!-- Advanced Sound Settings (hidden by default) -->
+        <materialDesign:Card Grid.Row="2" Margin="0,0,0,16" Padding="16"
+                             Visibility="{Binding IsChecked, ElementName=ExpandSlidersToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <!-- Frequency Slider -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Frequency" VerticalAlignment="Center" Opacity="0.7"/>
+                    <Slider x:Name="FrequencySlider"
+                            Grid.Column="1"
+                            Minimum="500" Maximum="8000"
+                            Value="5800"
+                            TickFrequency="100"
+                            ValueChanged="ToneParameter_ValueChanged"
+                            Margin="8,0"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Value, ElementName=FrequencySlider, StringFormat={}{0:F0} Hz}"
+                               VerticalAlignment="Center" TextAlignment="Right"/>
+                </Grid>
+
+                <!-- Noise Decay Slider -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Noise Decay" VerticalAlignment="Center" Opacity="0.7"/>
+                    <Slider x:Name="NoiseDecaySlider"
+                            Grid.Column="1"
+                            Minimum="10" Maximum="100"
+                            Value="60"
+                            TickFrequency="5"
+                            ValueChanged="ToneParameter_ValueChanged"
+                            Margin="8,0"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Value, ElementName=NoiseDecaySlider, StringFormat={}{0:F0}}"
+                               VerticalAlignment="Center" TextAlignment="Right"/>
+                </Grid>
+
+                <!-- Tone Decay Slider -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Tone Decay" VerticalAlignment="Center" Opacity="0.7"/>
+                    <Slider x:Name="ToneDecaySlider"
+                            Grid.Column="1"
+                            Minimum="5" Maximum="500"
+                            Value="200"
+                            TickFrequency="10"
+                            ValueChanged="ToneParameter_ValueChanged"
+                            Margin="8,0"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Value, ElementName=ToneDecaySlider, StringFormat={}{0:F0}}"
+                               VerticalAlignment="Center" TextAlignment="Right"/>
+                </Grid>
+
+                <!-- Tone Mix Slider -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Tone Mix" VerticalAlignment="Center" Opacity="0.7"/>
+                    <Slider x:Name="ToneMixSlider"
+                            Grid.Column="1"
+                            Minimum="0" Maximum="1.0"
+                            Value="0.1"
+                            TickFrequency="0.05"
+                            ValueChanged="ToneParameter_ValueChanged"
+                            Margin="8,0"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Value, ElementName=ToneMixSlider, StringFormat={}{0:P0}}"
+                               VerticalAlignment="Center" TextAlignment="Right"/>
+                </Grid>
+
+                <!-- Duration Slider -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Duration" VerticalAlignment="Center" Opacity="0.7"/>
+                    <Slider x:Name="DurationSlider"
+                            Grid.Column="1"
+                            Minimum="100" Maximum="1000"
+                            Value="500"
+                            TickFrequency="50"
+                            ValueChanged="ToneParameter_ValueChanged"
+                            Margin="8,0"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Value, ElementName=DurationSlider, StringFormat={}{0:F0} ms}"
+                               VerticalAlignment="Center" TextAlignment="Right"/>
+                </Grid>
+
+                <!-- Reset to Defaults Button -->
+                <Button Content="Reset to Defaults"
+                        Click="ResetDefaults_Click"
+                        Style="{StaticResource MaterialDesignFlatButton}"
+                        HorizontalAlignment="Left"
+                        Margin="0,4,0,0"/>
+            </StackPanel>
+        </materialDesign:Card>
+
+        <!-- Action Buttons -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Test Sound button -->
+            <Button x:Name="TestButton"
+                    Grid.Column="0"
+                    Content="Test Sound"
+                    Click="TestButton_Click"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    IsEnabled="False"/>
+
+            <!-- Settings toggle button next to Test Sound -->
+            <ToggleButton x:Name="ExpandSlidersToggle"
+                          Grid.Column="1"
+                          Style="{StaticResource MaterialDesignFlatPrimaryToggleButton}"
+                          ToolTip="Advanced sound settings"
+                          Width="32" Height="32"
+                          Margin="8,0,0,0">
+                <materialDesign:PackIcon Kind="TuneVariant" Width="18" Height="18"/>
+            </ToggleButton>
+
+            <!-- Hidden: Current device text (not needed in UI) -->
+            <TextBlock x:Name="CurrentDeviceText"
+                       Visibility="Collapsed"/>
+
+            <!-- Right: Cancel and OK buttons -->
+            <StackPanel Grid.Column="3"
+                        Orientation="Horizontal">
+                <Button Content="Cancel"
+                        Click="CancelButton_Click"
+                        Style="{StaticResource MaterialDesignOutlinedButton}"
+                        Margin="0,0,8,0"
+                        IsEnabled="True"/>
+                <Button x:Name="OkButton"
+                        Content="OK"
+                        Click="OkButton_Click"
+                        Style="{StaticResource MaterialDesignRaisedButton}"
+                        IsEnabled="False"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

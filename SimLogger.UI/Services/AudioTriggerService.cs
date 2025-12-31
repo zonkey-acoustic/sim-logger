@@ -107,10 +107,10 @@ public class AudioTriggerService : IDisposable
 
     public void TestTone(int deviceIndex)
     {
-        PlayToneOnDevice(deviceIndex, useTestWav: false);
+        PlayToneOnDevice(deviceIndex);
     }
 
-    private void PlayToneOnDevice(int deviceIndex, bool useTestWav = false)
+    private void PlayToneOnDevice(int deviceIndex)
     {
         try
         {
@@ -122,59 +122,20 @@ public class AudioTriggerService : IDisposable
                 DeviceNumber = deviceIndex
             };
 
-            // Use the actual WAV file for testing, generated sound for triggers
-            if (useTestWav)
+            var impactSound = new GolfImpactSampleProvider(
+                ToneFrequencyHz,
+                ToneNoiseDecay,
+                ToneToneDecay,
+                ToneMix,
+                ToneDurationMs);
+            _waveOut.Init(impactSound);
+            _waveOut.PlaybackStopped += (s, e) =>
             {
-                var testWavPath = @"C:\Users\jonth\OneDrive\Documents\Audacity\hit.wav";
-                if (File.Exists(testWavPath))
-                {
-                    var audioFile = new AudioFileReader(testWavPath);
-                    _waveOut.Init(audioFile);
-                    _waveOut.PlaybackStopped += (s, e) =>
-                    {
-                        audioFile.Dispose();
-                        var wo = s as WaveOutEvent;
-                        wo?.Dispose();
-                        if (_waveOut == wo)
-                            _waveOut = null;
-                    };
-                }
-                else
-                {
-                    // Fallback to generated sound if WAV not found
-                    var impactSound = new GolfImpactSampleProvider(
-                        ToneFrequencyHz,
-                        ToneNoiseDecay,
-                        ToneToneDecay,
-                        ToneMix,
-                        ToneDurationMs);
-                    _waveOut.Init(impactSound);
-                    _waveOut.PlaybackStopped += (s, e) =>
-                    {
-                        var wo = s as WaveOutEvent;
-                        wo?.Dispose();
-                        if (_waveOut == wo)
-                            _waveOut = null;
-                    };
-                }
-            }
-            else
-            {
-                var impactSound = new GolfImpactSampleProvider(
-                    ToneFrequencyHz,
-                    ToneNoiseDecay,
-                    ToneToneDecay,
-                    ToneMix,
-                    ToneDurationMs);
-                _waveOut.Init(impactSound);
-                _waveOut.PlaybackStopped += (s, e) =>
-                {
-                    var wo = s as WaveOutEvent;
-                    wo?.Dispose();
-                    if (_waveOut == wo)
-                        _waveOut = null;
-                };
-            }
+                var wo = s as WaveOutEvent;
+                wo?.Dispose();
+                if (_waveOut == wo)
+                    _waveOut = null;
+            };
 
             _waveOut.Play();
         }

@@ -1,6 +1,6 @@
 # Sim Logger
 
-A Windows desktop application for viewing and exporting golf shot data from [GSPro](https://gsprogolf.com/) golf simulator. Also features the ability to trigger third party shot recording software.
+A Windows desktop application for viewing and exporting golf shot data from [GSPro](https://gsprogolf.com/) golf simulator. Additional features include the ability to trigger third party swing recording software as well as AI shot analysis using your AI Assistant of choice via the provided MCP server.
 
 ![SimLogger Screenshot](screenshot.png)  
 
@@ -9,6 +9,11 @@ A Windows desktop application for viewing and exporting golf shot data from [GSP
 ### Shot Management
 - **Real-time monitoring** - Automatically detects new shots by polling GSPro's database
 - **Shot list view** - Browse all shots with club, ball speed, carry distance, etc.
+
+### Swing Recording - Audio & Network Trigger
+- **Audio Trigger** - Allows you to trigger swing recording software like [Kinovea](https://www.kinovea.org/) or [Swing Catalyst](https://swingcatalyst.com/) using the audio trigger option and by listening to the virtual audio cable output. 
+- **Network Trigger** - Use the new network trigger option in Kinovea 2025.1.1
+- **Device selection** - Route audio to any output device (useful for [virtual audio cables](https://vb-audio.com/Cable/))
 
 ### Export
 - **CSV export** - Export synced shots to CSV for analysis in Excel or other tools
@@ -68,12 +73,6 @@ A Windows desktop application for viewing and exporting golf shot data from [GSP
    - "How many shots do I have recorded?"
    - "Show me my driver statistics"
    - "Compare my 7 iron to my 8 iron"
-
-
-### Swing Recording - Audio & Network Trigger
-- **Audio Trigger** - Allows you to trigger swing recording software like [Kinovea](https://www.kinovea.org/) or [Swing Catalyst](https://swingcatalyst.com/) using the audio trigger option and by listening to the virtual audio cable output. 
-- **Network Trigger** - Use the new network trigger option in Kinovea 2025.1.1
-- **Device selection** - Route audio to any output device (useful for [virtual audio cables](https://vb-audio.com/Cable/))
 
 ## Requirements
 

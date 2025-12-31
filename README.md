@@ -2,6 +2,8 @@
 
 A Windows desktop application for viewing and exporting golf shot data from [GSPro](https://gsprogolf.com/) golf simulator. Also features the ability to trigger third party shot recording software.
 
+![SimLogger Screenshot](screenshot.png)  
+
 ## Features
 
 ### Shot Management
@@ -68,11 +70,10 @@ A Windows desktop application for viewing and exporting golf shot data from [GSP
    - "Compare my 7 iron to my 8 iron"
 
 
-### Audio & Network Trigger
-- **Audio notification** - Play a tone when a new shot is detected
+### Swing Recording - Audio & Network Trigger
+- **Audio Trigger** - Allows you to trigger swing recording software like [Kinovea](https://www.kinovea.org/) or [Swing Catalyst](https://swingcatalyst.com/) using the audio trigger option and by listening to the virtual audio cable output. 
+- **Network Trigger** - Use the new network trigger option in Kinovea 2025.1.1
 - **Device selection** - Route audio to any output device (useful for [virtual audio cables](https://vb-audio.com/Cable/))
-- **Configurable** - Enable/disable and select output device
-- **Kinovea** - Allows you to trigger swing recording software like [Kinovea](https://www.kinovea.org/) or [Swing Catalyst](https://swingcatalyst.com/) using the audio trigger option and by listening to the virtual audio cable output. Can also use the new network trigger option in Kinovea 2025.1.1
 
 ## Requirements
 
@@ -85,15 +86,15 @@ A Windows desktop application for viewing and exporting golf shot data from [GSP
 
 ## Installation
 
-1. Download the latest release
+1. Download the [latest release](https://github.com/jontheophilus/sim-logger/releases/latest)
 2. Extract to desired location
-3. Run `SimLogger.UI.exe`
+3. Run `SimLogger.exe`
 
 ## Building from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/sim-logger.git
+git clone https://github.com/jontheophilus/sim-logger.git
 cd sim-logger
 
 # Build the solution

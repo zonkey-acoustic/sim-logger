@@ -398,7 +398,7 @@ public class GSProDatabaseParser
 
     /// <summary>
     /// Gets shots within a time window around a specific timestamp.
-    /// Useful for matching ProTee shots to GSPro records.
+    /// Useful for matching launch monitor shots to GSPro records.
     /// </summary>
     public static List<GSProShot> GetShotsNearTimestamp(DateTime timestamp, double toleranceSeconds = 30, string? databasePath = null)
     {
@@ -415,7 +415,7 @@ public class GSProDatabaseParser
     }
 
     /// <summary>
-    /// Finds the best matching GSPro shot for a given ProTee shot timestamp and ball speed.
+    /// Finds the best matching GSPro shot for a given launch monitor shot timestamp and ball speed.
     /// Uses both timestamp proximity and ball speed matching for accuracy.
     /// </summary>
     public static GSProShot? FindMatchingShot(DateTime timestamp, double ballSpeedMph, double toleranceSeconds = 30, string? databasePath = null)

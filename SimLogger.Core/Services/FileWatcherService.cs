@@ -15,7 +15,7 @@ public class FileWatcherService : IDisposable
     private readonly object _lockObject = new();
     private readonly string? _gsProDatabasePath;
 
-    private const int PollIntervalMs = 2000; // Poll every 2 seconds
+    private const int PollIntervalMs = 500; // Poll every 500ms for faster detection
 
     public event EventHandler<NewShotDetectedEventArgs>? NewShotDetected;
 

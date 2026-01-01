@@ -351,46 +351,25 @@
 
                     <!-- Center: Toggle switches -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ToggleButton x:Name="AudioTriggerToggle"
+                        <ToggleButton x:Name="ShotTriggerToggle"
                                       Style="{StaticResource MaterialDesignSwitchToggleButton}"
                                       IsChecked="False"
-                                      Checked="AudioTriggerToggle_Changed"
-                                      Unchecked="AudioTriggerToggle_Changed"
+                                      Checked="ShotTriggerToggle_Changed"
+                                      Unchecked="ShotTriggerToggle_Changed"
                                       VerticalAlignment="Center"/>
-                        <TextBlock Text="Audio Trigger"
+                        <TextBlock x:Name="ShotTriggerLabel"
+                                   Text="Shot Trigger"
                                    Style="{StaticResource MaterialDesignBody2TextBlock}"
                                    Opacity="0.7"
                                    Margin="8,0,4,0"
                                    VerticalAlignment="Center"/>
-                        <Button x:Name="AudioDeviceButton"
+                        <Button x:Name="ShotTriggerConfigButton"
                                 Style="{StaticResource MaterialDesignIconButton}"
-                                Click="AudioDeviceButton_Click"
-                                ToolTip="Select audio output device"
+                                Click="ShotTriggerConfigButton_Click"
+                                ToolTip="Configure shot trigger"
                                 Width="32" Height="32"
                                 Padding="4">
-                            <materialDesign:PackIcon Kind="Speaker" Width="18" Height="18"/>
-                        </Button>
-
-                        <Rectangle Width="1" Fill="{DynamicResource MaterialDesignDivider}" Margin="16,4"/>
-
-                        <ToggleButton x:Name="NetworkTriggerToggle"
-                                      Style="{StaticResource MaterialDesignSwitchToggleButton}"
-                                      IsChecked="False"
-                                      Checked="NetworkTriggerToggle_Changed"
-                                      Unchecked="NetworkTriggerToggle_Changed"
-                                      VerticalAlignment="Center"/>
-                        <TextBlock Text="Network Trigger"
-                                   Style="{StaticResource MaterialDesignBody2TextBlock}"
-                                   Opacity="0.7"
-                                   Margin="8,0,4,0"
-                                   VerticalAlignment="Center"/>
-                        <Button x:Name="NetworkPortButton"
-                                Style="{StaticResource MaterialDesignIconButton}"
-                                Click="NetworkPortButton_Click"
-                                ToolTip="Configure UDP port"
-                                Width="32" Height="32"
-                                Padding="4">
-                            <materialDesign:PackIcon Kind="Lan" Width="18" Height="18"/>
+                            <materialDesign:PackIcon Kind="Cog" Width="18" Height="18"/>
                         </Button>
 
                         <Rectangle Width="1" Fill="{DynamicResource MaterialDesignDivider}" Margin="16,4"/>
@@ -451,7 +430,8 @@
                              Width="8" Height="8"
                              Fill="#4CAF50"
                              VerticalAlignment="Center"/>
-                    <TextBlock Text="Monitoring"
+                    <TextBlock x:Name="MonitoringModeText"
+                               Text="File monitoring"
                                Style="{StaticResource MaterialDesignCaptionTextBlock}"
                                Opacity="0.5"
                                Margin="6,0,12,0"

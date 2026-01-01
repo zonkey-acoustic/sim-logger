@@ -16,10 +16,8 @@ public partial class ShotListView : UserControl
     // Events for MainWindow to subscribe to
     public event RoutedEventHandler? SyncButtonClick;
     public event RoutedEventHandler? CancelSyncButtonClick;
-    public event RoutedEventHandler? AudioTriggerToggleChanged;
-    public event RoutedEventHandler? AudioDeviceButtonClick;
-    public event RoutedEventHandler? NetworkTriggerToggleChanged;
-    public event RoutedEventHandler? NetworkPortButtonClick;
+    public event RoutedEventHandler? ShotTriggerToggleChanged;
+    public event RoutedEventHandler? ShotTriggerConfigButtonClick;
     public event RoutedEventHandler? ExportCsvButtonClick;
     public event RoutedEventHandler? DataStorageButtonClick;
     public event RoutedEventHandler? GSProPathButtonClick;
@@ -288,19 +286,20 @@ public partial class ShotListView : UserControl
     public ProgressBar SyncProgressBarControl => SyncProgressBar;
     public TextBlock SyncStatusTextControl => SyncStatusText;
     public Button CancelSyncButtonControl => CancelSyncButton;
-    public ToggleButton AudioTriggerToggleControl => AudioTriggerToggle;
-    public Button AudioDeviceButtonControl => AudioDeviceButton;
-    public ToggleButton NetworkTriggerToggleControl => NetworkTriggerToggle;
-    public Button NetworkPortButtonControl => NetworkPortButton;
+    public ToggleButton ShotTriggerToggleControl => ShotTriggerToggle;
+    public TextBlock ShotTriggerLabelControl => ShotTriggerLabel;
+    public Button ShotTriggerConfigButtonControl => ShotTriggerConfigButton;
     public Button ExportCsvButtonControl => ExportCsvButton;
     public Button DataStorageButtonControl => DataStorageButton;
     public Button GSProPathButtonControl => GSProPathButton;
+    public TextBlock MonitoringModeTextControl => MonitoringModeText;
 
-    public void SetAudioDeviceTooltip(string? deviceName)
+    public void SetShotTriggerTooltip(bool isAudio, string? detail)
     {
-        AudioDeviceButton.ToolTip = string.IsNullOrEmpty(deviceName)
-            ? "Select audio output device"
-            : $"Audio device: {deviceName}\nClick to change";
+        var triggerType = isAudio ? "Audio" : "Network";
+        ShotTriggerConfigButton.ToolTip = string.IsNullOrEmpty(detail)
+            ? "Configure shot trigger"
+            : $"{triggerType} trigger: {detail}\nClick to configure";
     }
 
     public void SetDataStorageTooltip(string? path)
@@ -308,13 +307,6 @@ public partial class ShotListView : UserControl
         DataStorageButton.ToolTip = string.IsNullOrEmpty(path)
             ? "Data storage: Default location\nClick to change"
             : $"Data storage: {path}\nClick to change";
-    }
-
-    public void SetNetworkPortTooltip(int port, string? host)
-    {
-        NetworkPortButton.ToolTip = port <= 0
-            ? "Configure UDP port"
-            : $"UDP: {host ?? "127.0.0.1"}:{port}\nClick to change";
     }
 
     public void SetGSProPathTooltip(string? path)
@@ -403,14 +395,14 @@ public partial class ShotListView : UserControl
         CancelSyncButtonClick?.Invoke(sender, e);
     }
 
-    private void AudioTriggerToggle_Changed(object sender, RoutedEventArgs e)
+    private void ShotTriggerToggle_Changed(object sender, RoutedEventArgs e)
     {
-        AudioTriggerToggleChanged?.Invoke(sender, e);
+        ShotTriggerToggleChanged?.Invoke(sender, e);
     }
 
-    private void AudioDeviceButton_Click(object sender, RoutedEventArgs e)
+    private void ShotTriggerConfigButton_Click(object sender, RoutedEventArgs e)
     {
-        AudioDeviceButtonClick?.Invoke(sender, e);
+        ShotTriggerConfigButtonClick?.Invoke(sender, e);
     }
 
     private void ExportCsvButton_Click(object sender, RoutedEventArgs e)
@@ -421,16 +413,6 @@ public partial class ShotListView : UserControl
     private void DataStorageButton_Click(object sender, RoutedEventArgs e)
     {
         DataStorageButtonClick?.Invoke(sender, e);
-    }
-
-    private void NetworkTriggerToggle_Changed(object sender, RoutedEventArgs e)
-    {
-        NetworkTriggerToggleChanged?.Invoke(sender, e);
-    }
-
-    private void NetworkPortButton_Click(object sender, RoutedEventArgs e)
-    {
-        NetworkPortButtonClick?.Invoke(sender, e);
     }
 
     private void GSProPathButton_Click(object sender, RoutedEventArgs e)

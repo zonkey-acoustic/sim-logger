@@ -54,8 +54,11 @@ public partial class MainWindow : Window
             TargetHost = _audioTriggerService.NetworkTriggerHost
         };
 
-        // Initialize real-time traffic monitor (if enabled and Npcap is installed)
-        if (_audioTriggerService.RealtimeDetectionEnabled && GSProTrafficMonitor.IsNpcapInstalled())
+        // Initialize real-time traffic monitor (only if shot trigger is enabled)
+        var shouldStartMonitor = (_audioTriggerService.IsEnabled || _audioTriggerService.NetworkTriggerEnabled)
+                                 && _audioTriggerService.RealtimeDetectionEnabled
+                                 && GSProTrafficMonitor.IsNpcapInstalled();
+        if (shouldStartMonitor)
         {
             _trafficMonitor = new GSProTrafficMonitor
             {
@@ -81,25 +84,20 @@ public partial class MainWindow : Window
         _shotListViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         // Set initial toggle states from saved settings BEFORE wiring up events
-        // This prevents event handlers from running during initialization
-        ShotListView.AudioTriggerToggleControl.IsChecked = _audioTriggerService.IsEnabled;
-        ShotListView.SetAudioDeviceTooltip(_audioTriggerService.SelectedDeviceName);
+        // Shot trigger is on if either audio or network trigger is enabled
+        var shotTriggerEnabled = _audioTriggerService.IsEnabled || _audioTriggerService.NetworkTriggerEnabled;
+        ShotListView.ShotTriggerToggleControl.IsChecked = shotTriggerEnabled;
+        UpdateShotTriggerLabel();
         ShotListView.SetDataStorageTooltip(_audioTriggerService.DataStoragePath);
         ShotListView.SetGSProPathTooltip(_audioTriggerService.GSProPath);
-        ShotListView.NetworkTriggerToggleControl.IsChecked = _audioTriggerService.NetworkTriggerEnabled;
-        ShotListView.SetNetworkPortTooltip(_audioTriggerService.NetworkTriggerPort, _audioTriggerService.NetworkTriggerHost);
 
         // Wire up sync button events from ShotListView
         ShotListView.SyncButtonClick += SyncButton_Click;
         ShotListView.CancelSyncButtonClick += CancelSyncButton_Click;
 
-        // Wire up audio trigger events
-        ShotListView.AudioTriggerToggleChanged += AudioTriggerToggle_Changed;
-        ShotListView.AudioDeviceButtonClick += AudioDeviceButton_Click;
-
-        // Wire up network trigger events
-        ShotListView.NetworkTriggerToggleChanged += NetworkTriggerToggle_Changed;
-        ShotListView.NetworkPortButtonClick += NetworkPortButton_Click;
+        // Wire up shot trigger events
+        ShotListView.ShotTriggerToggleChanged += ShotTriggerToggle_Changed;
+        ShotListView.ShotTriggerConfigButtonClick += ShotTriggerConfigButton_Click;
 
         // Wire up export event
         ShotListView.ExportCsvButtonClick += ExportCsvButton_Click;
@@ -146,12 +144,14 @@ public partial class MainWindow : Window
             try
             {
                 _trafficMonitor.Start();
-                ShotListView.StatusTextControl.Text = $"Real-time detection active (port {_audioTriggerService.GSProApiPort})";
+                ShotListView.MonitoringModeTextControl.Text = "Real-time";
+                ShotListView.StatusTextControl.Text = $"Monitoring port {_audioTriggerService.GSProApiPort}";
                 // Skip file watcher when using real-time detection
             }
             catch (Exception ex)
             {
-                ShotListView.StatusTextControl.Text = $"Real-time detection failed: {ex.Message}";
+                ShotListView.MonitoringModeTextControl.Text = "File monitoring";
+                ShotListView.StatusTextControl.Text = $"Real-time failed: {ex.Message}";
                 System.Diagnostics.Debug.WriteLine($"Traffic monitor failed to start: {ex.Message}");
                 // Fall back to file watcher if traffic monitor fails
                 _fileWatcher.Start();
@@ -160,6 +160,7 @@ public partial class MainWindow : Window
         else
         {
             // Use file watcher as fallback when real-time detection is not available
+            ShotListView.MonitoringModeTextControl.Text = "File monitoring";
             _fileWatcher.Start();
         }
     }
@@ -423,8 +424,8 @@ public partial class MainWindow : Window
             _shotDataService.ClearCache();
             await LoadShotsAsync();
 
-            // Fire triggers (with debouncing - traffic monitor may have already fired them)
-            FireTriggersIfNotRecent();
+            // Note: Triggers are NOT fired here - database polling has delay issues.
+            // Triggers only fire from real-time traffic monitoring (OnTrafficShotDetected).
 
             // Auto-sync new shot to database
             if (e.Shot != null)
@@ -475,81 +476,140 @@ public partial class MainWindow : Window
         _networkTriggerService.SendTriggerPacket();
     }
 
-    private void AudioTriggerToggle_Changed(object? sender, RoutedEventArgs e)
+    private void ShotTriggerToggle_Changed(object? sender, RoutedEventArgs e)
     {
-        var isEnabled = ShotListView.AudioTriggerToggleControl.IsChecked == true;
+        var isEnabled = ShotListView.ShotTriggerToggleControl.IsChecked == true;
 
-        // If enabling, check that an audio device has been selected
-        if (isEnabled && _audioTriggerService.SelectedDeviceIndex < 0)
+        if (isEnabled)
         {
-            ShotListView.AudioTriggerToggleControl.IsChecked = false;
+            // Check if trigger is configured
+            var hasAudioConfig = _audioTriggerService.SelectedDeviceIndex >= 0;
+            var hasNetworkConfig = _audioTriggerService.NetworkTriggerPort > 0;
+
+            if (!hasAudioConfig && !hasNetworkConfig)
+            {
+                // No configuration - open dialog to configure
+                ShotListView.ShotTriggerToggleControl.IsChecked = false;
+                ShotTriggerConfigButton_Click(sender, e);
+                return;
+            }
+
+            // Check if Npcap is installed
+            if (!GSProTrafficMonitor.IsNpcapInstalled())
+            {
+                ShotListView.ShotTriggerToggleControl.IsChecked = false;
+                MessageDialog.Show(
+                    this,
+                    "Npcap Required",
+                    "Shot triggers require Npcap for real-time detection.\n\n" +
+                    "Please download and install Npcap from:\nhttps://npcap.com/\n\n" +
+                    "After installing, restart Sim Logger.",
+                    MessageDialogType.Warning);
+                return;
+            }
+
+            // Enable real-time detection
+            _audioTriggerService.RealtimeDetectionEnabled = true;
+        }
+        else
+        {
+            // Disable everything
+            _audioTriggerService.IsEnabled = false;
+            _audioTriggerService.NetworkTriggerEnabled = false;
+            _audioTriggerService.RealtimeDetectionEnabled = false;
+            _networkTriggerService.IsEnabled = false;
+        }
+
+        _audioTriggerService.SaveSettings();
+        UpdateShotTriggerLabel();
+
+        if (isEnabled)
+        {
             MessageDialog.Show(
                 this,
-                "Configuration Required",
-                "Please select an audio output device before enabling the audio trigger.",
-                MessageDialogType.Warning);
-            return;
-        }
-
-        _audioTriggerService.IsEnabled = isEnabled;
-        _audioTriggerService.SaveSettings();
-    }
-
-    private void AudioDeviceButton_Click(object? sender, RoutedEventArgs e)
-    {
-        var dialog = new AudioDeviceDialog(_audioTriggerService)
-        {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() == true && dialog.SelectedDevice != null)
-        {
-            _audioTriggerService.SelectedDeviceIndex = dialog.SelectedDevice.Index;
-            _audioTriggerService.SelectedDeviceName = dialog.SelectedDevice.Name;
-            _audioTriggerService.SaveSettings();
-            ShotListView.SetAudioDeviceTooltip(_audioTriggerService.SelectedDeviceName);
+                "Restart Required",
+                "Shot trigger has been enabled.\n\nPlease restart Sim Logger for changes to take effect.",
+                MessageDialogType.Information);
         }
     }
 
-    private void NetworkTriggerToggle_Changed(object? sender, RoutedEventArgs e)
+    private void ShotTriggerConfigButton_Click(object? sender, RoutedEventArgs e)
     {
-        var isEnabled = ShotListView.NetworkTriggerToggleControl.IsChecked == true;
-
-        // If enabling, check that a port has been configured
-        if (isEnabled && _audioTriggerService.NetworkTriggerPort <= 0)
-        {
-            ShotListView.NetworkTriggerToggleControl.IsChecked = false;
-            MessageDialog.Show(
-                this,
-                "Configuration Required",
-                "Please configure a UDP port before enabling the network trigger.",
-                MessageDialogType.Warning);
-            return;
-        }
-
-        _networkTriggerService.IsEnabled = isEnabled;
-        _audioTriggerService.NetworkTriggerEnabled = isEnabled;
-        _audioTriggerService.SaveSettings();
-    }
-
-    private void NetworkPortButton_Click(object? sender, RoutedEventArgs e)
-    {
-        var dialog = new NetworkPortDialog(
+        var dialog = new ShotTriggerDialog(
+            _audioTriggerService,
             _networkTriggerService,
+            _audioTriggerService.IsEnabled,
+            _audioTriggerService.NetworkTriggerEnabled,
             _audioTriggerService.NetworkTriggerPort,
-            _audioTriggerService.NetworkTriggerHost)
+            _audioTriggerService.NetworkTriggerHost,
+            _audioTriggerService.GSProApiPort)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() == true)
         {
-            _networkTriggerService.Port = dialog.SelectedPort;
-            _networkTriggerService.TargetHost = dialog.SelectedHost;
-            _audioTriggerService.NetworkTriggerPort = dialog.SelectedPort;
-            _audioTriggerService.NetworkTriggerHost = dialog.SelectedHost;
+            // Save audio settings
+            if (dialog.UseAudioTrigger && dialog.SelectedAudioDevice != null)
+            {
+                _audioTriggerService.SelectedDeviceIndex = dialog.SelectedAudioDevice.Index;
+                _audioTriggerService.SelectedDeviceName = dialog.SelectedAudioDevice.Name;
+                _audioTriggerService.IsEnabled = true;
+                _audioTriggerService.NetworkTriggerEnabled = false;
+                _networkTriggerService.IsEnabled = false;
+
+                // Save tone parameters
+                _audioTriggerService.ToneFrequencyHz = dialog.ToneFrequencyHz;
+                _audioTriggerService.ToneNoiseDecay = dialog.ToneNoiseDecay;
+                _audioTriggerService.ToneToneDecay = dialog.ToneToneDecay;
+                _audioTriggerService.ToneMix = dialog.ToneMix;
+                _audioTriggerService.ToneDurationMs = dialog.ToneDurationMs;
+            }
+            // Save network settings
+            else if (dialog.UseNetworkTrigger)
+            {
+                _audioTriggerService.NetworkTriggerPort = dialog.NetworkPort;
+                _audioTriggerService.NetworkTriggerHost = dialog.NetworkHost;
+                _audioTriggerService.NetworkTriggerEnabled = true;
+                _audioTriggerService.IsEnabled = false;
+                _networkTriggerService.Port = dialog.NetworkPort;
+                _networkTriggerService.TargetHost = dialog.NetworkHost;
+                _networkTriggerService.IsEnabled = true;
+            }
+
+            // Save realtime port
+            _audioTriggerService.GSProApiPort = dialog.RealtimePort;
+            _audioTriggerService.RealtimeDetectionEnabled = true;
             _audioTriggerService.SaveSettings();
-            ShotListView.SetNetworkPortTooltip(dialog.SelectedPort, dialog.SelectedHost);
+
+            // Enable the toggle
+            ShotListView.ShotTriggerToggleControl.IsChecked = true;
+            UpdateShotTriggerLabel();
+
+            MessageDialog.Show(
+                this,
+                "Restart Required",
+                "Shot trigger has been configured.\n\nPlease restart Sim Logger for changes to take effect.",
+                MessageDialogType.Information);
+        }
+    }
+
+    private void UpdateShotTriggerLabel()
+    {
+        if (_audioTriggerService.IsEnabled)
+        {
+            ShotListView.ShotTriggerLabelControl.Text = "Shot Trigger (Audio)";
+            ShotListView.SetShotTriggerTooltip(true, _audioTriggerService.SelectedDeviceName);
+        }
+        else if (_audioTriggerService.NetworkTriggerEnabled)
+        {
+            ShotListView.ShotTriggerLabelControl.Text = "Shot Trigger (Network)";
+            ShotListView.SetShotTriggerTooltip(false, $"{_audioTriggerService.NetworkTriggerHost}:{_audioTriggerService.NetworkTriggerPort}");
+        }
+        else
+        {
+            ShotListView.ShotTriggerLabelControl.Text = "Shot Trigger";
+            ShotListView.SetShotTriggerTooltip(true, null);
         }
     }
 

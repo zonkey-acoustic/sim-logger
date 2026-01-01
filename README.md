@@ -109,4 +109,4 @@ MIT License
 
 ## Note
 
-This project was built with help from [Claude Code](https://claudecode.co/).
+This project was built with help from [Claude Code](https://claude.ai/).

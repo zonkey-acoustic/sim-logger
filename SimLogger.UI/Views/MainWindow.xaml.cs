@@ -17,8 +17,13 @@ public partial class MainWindow : Window
     private readonly SyncViewModel _syncViewModel;
     private readonly SyncService _syncService;
     private readonly FileWatcherService _fileWatcher;
+    private readonly GSProTrafficMonitor? _trafficMonitor;
     private readonly AudioTriggerService _audioTriggerService;
     private readonly NetworkTriggerService _networkTriggerService;
+
+    // Deduplication: track recent trigger timestamps to prevent double-firing
+    private DateTime _lastTriggerTime = DateTime.MinValue;
+    private readonly TimeSpan _triggerDebounceInterval = TimeSpan.FromMilliseconds(500);
 
     // Windows DWM API for dark title bar
     [DllImport("dwmapi.dll", PreserveSig = true)]
@@ -48,6 +53,17 @@ public partial class MainWindow : Window
             Port = _audioTriggerService.NetworkTriggerPort,
             TargetHost = _audioTriggerService.NetworkTriggerHost
         };
+
+        // Initialize real-time traffic monitor (if enabled and Npcap is installed)
+        if (_audioTriggerService.RealtimeDetectionEnabled && GSProTrafficMonitor.IsNpcapInstalled())
+        {
+            _trafficMonitor = new GSProTrafficMonitor
+            {
+                GSProPort = _audioTriggerService.GSProApiPort
+            };
+            _trafficMonitor.ShotDetected += OnTrafficShotDetected;
+            _trafficMonitor.Error += OnTrafficMonitorError;
+        }
 
         // Initialize shot data service with configured data storage path and GSPro path
         _shotDataService = new ShotDataService(_audioTriggerService.DataStoragePath, _audioTriggerService.GetGSProDatabasePath());
@@ -124,7 +140,28 @@ public partial class MainWindow : Window
         // Sync any existing unsynced shots from GSPro on startup
         await InitialSyncAsync();
 
-        _fileWatcher.Start();
+        // Start traffic monitor for real-time shot detection (if available)
+        if (_trafficMonitor != null)
+        {
+            try
+            {
+                _trafficMonitor.Start();
+                ShotListView.StatusTextControl.Text = $"Real-time detection active (port {_audioTriggerService.GSProApiPort})";
+                // Skip file watcher when using real-time detection
+            }
+            catch (Exception ex)
+            {
+                ShotListView.StatusTextControl.Text = $"Real-time detection failed: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"Traffic monitor failed to start: {ex.Message}");
+                // Fall back to file watcher if traffic monitor fails
+                _fileWatcher.Start();
+            }
+        }
+        else
+        {
+            // Use file watcher as fallback when real-time detection is not available
+            _fileWatcher.Start();
+        }
     }
 
     private async Task InitialSyncAsync()
@@ -386,11 +423,8 @@ public partial class MainWindow : Window
             _shotDataService.ClearCache();
             await LoadShotsAsync();
 
-            // Play audio trigger if enabled
-            _audioTriggerService.PlayTriggerTone();
-
-            // Send network trigger if enabled
-            _networkTriggerService.SendTriggerPacket();
+            // Fire triggers (with debouncing - traffic monitor may have already fired them)
+            FireTriggersIfNotRecent();
 
             // Auto-sync new shot to database
             if (e.Shot != null)
@@ -398,6 +432,47 @@ public partial class MainWindow : Window
                 await AutoSyncShotAsync(e.Shot);
             }
         });
+    }
+
+    private void OnTrafficShotDetected(object? sender, ShotTrafficDetectedEventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ShotListView.StatusTextControl.Text = "Shot detected (real-time)!";
+
+            // Fire triggers immediately - this is the real-time path
+            FireTriggersIfNotRecent();
+        });
+    }
+
+    private void OnTrafficMonitorError(object? sender, TrafficMonitorErrorEventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            System.Diagnostics.Debug.WriteLine($"Traffic monitor error: {e.Message}");
+        });
+    }
+
+    /// <summary>
+    /// Fires audio and network triggers if not fired recently (debouncing).
+    /// Prevents double-firing when both traffic monitor and file watcher detect the same shot.
+    /// </summary>
+    private void FireTriggersIfNotRecent()
+    {
+        var now = DateTime.Now;
+        if (now - _lastTriggerTime < _triggerDebounceInterval)
+        {
+            // Already fired recently, skip to prevent double-triggering
+            return;
+        }
+
+        _lastTriggerTime = now;
+
+        // Play audio trigger if enabled
+        _audioTriggerService.PlayTriggerTone();
+
+        // Send network trigger if enabled
+        _networkTriggerService.SendTriggerPacket();
     }
 
     private void AudioTriggerToggle_Changed(object? sender, RoutedEventArgs e)
@@ -651,6 +726,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _fileWatcher.Dispose();
+        _trafficMonitor?.Dispose();
         _audioTriggerService.Dispose();
         _networkTriggerService.Dispose();
         base.OnClosed(e);

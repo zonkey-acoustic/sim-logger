@@ -22,6 +22,10 @@ public class AudioTriggerService : IDisposable
     public int NetworkTriggerPort { get; set; } = 8875;
     public string? NetworkTriggerHost { get; set; } = "127.0.0.1";
 
+    // Real-time shot detection settings (traffic monitoring)
+    public bool RealtimeDetectionEnabled { get; set; }
+    public int GSProApiPort { get; set; } = 12321;
+
     // Tone envelope parameters (golf impact sound)
     public double ToneFrequencyHz { get; set; } = 5800;    // 500-8000 Hz
     public double ToneNoiseDecay { get; set; } = 60;       // 10-100 (higher = shorter)
@@ -270,6 +274,8 @@ public class AudioTriggerService : IDisposable
                 NetworkTriggerEnabled = NetworkTriggerEnabled,
                 NetworkTriggerPort = NetworkTriggerPort,
                 NetworkTriggerHost = NetworkTriggerHost,
+                RealtimeDetectionEnabled = RealtimeDetectionEnabled,
+                GSProApiPort = GSProApiPort,
                 ToneFrequencyHz = ToneFrequencyHz,
                 ToneNoiseDecay = ToneNoiseDecay,
                 ToneToneDecay = ToneToneDecay,
@@ -307,6 +313,10 @@ public class AudioTriggerService : IDisposable
                     NetworkTriggerEnabled = settings.NetworkTriggerEnabled;
                     NetworkTriggerPort = settings.NetworkTriggerPort;
                     NetworkTriggerHost = settings.NetworkTriggerHost ?? "127.0.0.1";
+
+                    // Load real-time detection settings
+                    RealtimeDetectionEnabled = settings.RealtimeDetectionEnabled;
+                    GSProApiPort = settings.GSProApiPort > 0 ? settings.GSProApiPort : 1250;
 
                     // Load tone parameters (with defaults for backward compatibility)
                     ToneFrequencyHz = settings.ToneFrequencyHz > 0 ? settings.ToneFrequencyHz : 5800;
@@ -363,6 +373,10 @@ public class AudioTriggerSettings
     public bool NetworkTriggerEnabled { get; set; }
     public int NetworkTriggerPort { get; set; } = 8875;
     public string? NetworkTriggerHost { get; set; } = "127.0.0.1";
+
+    // Real-time shot detection settings (traffic monitoring)
+    public bool RealtimeDetectionEnabled { get; set; }
+    public int GSProApiPort { get; set; } = 12321;
 
     // Tone envelope parameters (golf impact sound)
     public double ToneFrequencyHz { get; set; } = 5800;    // 500-8000 Hz

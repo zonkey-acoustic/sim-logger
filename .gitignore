@@ -42,6 +42,8 @@ artifacts/
 
 # Distribution output
 dist/
+publish/
+*.zip
 
 # Claude
 .claude

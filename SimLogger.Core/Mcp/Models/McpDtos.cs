@@ -13,7 +13,8 @@ public record ShotSummary(
     string ClubSpeed,
     string LaunchAngle,
     string SmashFactor,
-    double? DistanceToTarget
+    double? DistanceToTarget,
+    List<string> Tags
 );
 
 /// <summary>
@@ -25,6 +26,7 @@ public record ShotDetails(
     string SmashFactor,
     double? DistanceToTarget,
     int SessionId,
+    List<string> Tags,
     ClubDataDto? Club,
     BallDataDto? Ball,
     FlightDataDto? Flight,
@@ -88,6 +90,7 @@ public record PhysicsSettingsDto(
 /// </summary>
 public record ShotSearchCriteria(
     string? ClubName,
+    string? Tag,
     DateTime? StartDate,
     DateTime? EndDate,
     double? MinCarry,

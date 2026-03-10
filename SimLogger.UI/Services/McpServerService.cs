@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 using SimLogger.Core.Data;
 using SimLogger.Core.Mcp;
@@ -29,6 +30,10 @@ public static class McpServerRunner
 
         // Build and run the MCP server
         var builder = Host.CreateApplicationBuilder();
+
+        // Suppress all console logging — stdout is reserved for MCP stdio transport
+        builder.Logging.ClearProviders();
+        builder.Logging.AddFilter(_ => false);
 
         // Register our data provider as a singleton so tools can access it
         builder.Services.AddSingleton(dataProvider);

@@ -74,9 +74,9 @@ public class ShotRepository
             var shotCommand = connection.CreateCommand();
             shotCommand.CommandText = """
                 INSERT INTO Shots (SessionID, ShotID, ShotNumber, DateTime, DirectoryName, DirectoryTimestamp,
-                                   SmashFactor, IsRealShot, UseOverrideData, DistanceToTarget, GSProShotId, SyncedAt)
+                                   SmashFactor, IsRealShot, UseOverrideData, DistanceToTarget, GSProShotId, Tags, SyncedAt)
                 VALUES (@sessionId, @shotId, @shotNumber, @dateTime, @directoryName, @directoryTimestamp,
-                        @smashFactor, @isRealShot, @useOverrideData, @distanceToTarget, @gsProShotId, @syncedAt);
+                        @smashFactor, @isRealShot, @useOverrideData, @distanceToTarget, @gsProShotId, @tags, @syncedAt);
                 SELECT last_insert_rowid();
                 """;
 
@@ -91,6 +91,7 @@ public class ShotRepository
             shotCommand.Parameters.AddWithValue("@useOverrideData", shot.UseOverrideData ? 1 : 0);
             shotCommand.Parameters.AddWithValue("@distanceToTarget", shot.DistanceToTarget.HasValue ? shot.DistanceToTarget.Value : DBNull.Value);
             shotCommand.Parameters.AddWithValue("@gsProShotId", shot.GSProShotId > 0 ? shot.GSProShotId : DBNull.Value);
+            shotCommand.Parameters.AddWithValue("@tags", shot.Tags.Count > 0 ? string.Join("|", shot.Tags) : (object)DBNull.Value);
             shotCommand.Parameters.AddWithValue("@syncedAt", DateTime.UtcNow.ToString("O"));
 
             var dbShotId = Convert.ToInt64(await shotCommand.ExecuteScalarAsync());
@@ -251,6 +252,12 @@ public class ShotRepository
                 UseOverrideData = reader.GetInt32(reader.GetOrdinal("UseOverrideData")) == 1,
                 DistanceToTarget = reader.IsDBNull(reader.GetOrdinal("DistanceToTarget")) ? null : reader.GetDouble(reader.GetOrdinal("DistanceToTarget")),
                 GSProShotId = reader.IsDBNull(reader.GetOrdinal("GSProShotId")) ? 0 : reader.GetInt32(reader.GetOrdinal("GSProShotId")),
+                Tags = reader.IsDBNull(reader.GetOrdinal("Tags"))
+                    ? new List<string>()
+                    : reader.GetString(reader.GetOrdinal("Tags"))
+                        .Split('|', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(t => t.Trim())
+                        .ToList(),
                 IsSynced = true
             };
 
@@ -378,6 +385,18 @@ public class ShotRepository
 
         var result = await command.ExecuteScalarAsync();
         return Convert.ToInt32(result);
+    }
+
+    public async Task UpdateShotTagsAsync(string directoryName, List<string> tags)
+    {
+        await using var connection = _context.CreateConnection();
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE Shots SET Tags = @tags WHERE DirectoryName = @directoryName";
+        command.Parameters.AddWithValue("@tags", tags.Count > 0 ? string.Join("|", tags) : (object)DBNull.Value);
+        command.Parameters.AddWithValue("@directoryName", directoryName);
+        await command.ExecuteNonQueryAsync();
     }
 
     public async Task<bool> DeleteShotByDirectoryNameAsync(string directoryName)

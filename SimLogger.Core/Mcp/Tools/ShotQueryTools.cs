@@ -44,11 +44,13 @@ public static class ShotQueryTools
         return JsonSerializer.Serialize(shot, JsonOptions);
     }
 
-    [McpServerTool(Name = "search_shots"), Description("Search for golf shots with optional filters for club name, date range, and carry distance range.")]
+    [McpServerTool(Name = "search_shots"), Description("Search for golf shots with optional filters for club name, tag, date range, and carry distance range.")]
     public static async Task<string> SearchShots(
         McpShotDataProvider provider,
         [Description("Filter by club name (e.g., 'Driver', '7 Iron'). Partial matches supported.")]
         string? clubName = null,
+        [Description("Filter by user-defined tag (e.g., 'new shaft', 'adjusted loft'). Partial matches supported.")]
+        string? tag = null,
         [Description("Start date in yyyy-MM-dd format")]
         string? startDate = null,
         [Description("End date in yyyy-MM-dd format")]
@@ -79,6 +81,7 @@ public static class ShotQueryTools
 
         var criteria = new ShotSearchCriteria(
             clubName,
+            tag,
             parsedStartDate,
             parsedEndDate,
             minCarry,
@@ -101,7 +104,7 @@ public static class ShotQueryTools
         if (string.IsNullOrWhiteSpace(clubName))
             return JsonSerializer.Serialize(new { error = "Club name is required" }, JsonOptions);
 
-        var criteria = new ShotSearchCriteria(clubName, null, null, null, null, Math.Clamp(maxResults, 1, 100));
+        var criteria = new ShotSearchCriteria(clubName, null, null, null, null, null, Math.Clamp(maxResults, 1, 100));
         var shots = await provider.SearchShotsAsync(criteria);
         return JsonSerializer.Serialize(new { club = clubName, shots, count = shots.Count }, JsonOptions);
     }

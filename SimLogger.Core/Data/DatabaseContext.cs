@@ -78,6 +78,14 @@ public class DatabaseContext : IDisposable
             await alterCommand.ExecuteNonQueryAsync();
         }
 
+        // Migration: Add Tags column if it doesn't exist
+        if (!existingColumns.Contains("Tags"))
+        {
+            var alterCommand = connection.CreateCommand();
+            alterCommand.CommandText = "ALTER TABLE Shots ADD COLUMN Tags TEXT";
+            await alterCommand.ExecuteNonQueryAsync();
+        }
+
         // Migration: Add GSProShotId column if it doesn't exist
         if (!existingColumns.Contains("GSProShotId"))
         {
@@ -109,6 +117,7 @@ public class DatabaseContext : IDisposable
                 UseOverrideData INTEGER NOT NULL DEFAULT 0,
                 DistanceToTarget REAL,
                 GSProShotId INTEGER,
+                Tags TEXT,
                 SyncedAt TEXT NOT NULL,
                 UNIQUE(DirectoryName)
             );

@@ -94,6 +94,27 @@ public class ShotDataService
             .OrderBy(c => c);
     }
 
+    public IEnumerable<string> GetUniqueTags()
+    {
+        if (_cachedShots == null)
+            return Enumerable.Empty<string>();
+
+        return _cachedShots
+            .SelectMany(s => s.Tags)
+            .Where(t => !string.IsNullOrEmpty(t))
+            .Distinct()
+            .OrderBy(t => t);
+    }
+
+    public async Task UpdateShotTagsAsync(ShotData shot, List<string> tags)
+    {
+        if (shot.IsSynced)
+        {
+            await _repository.UpdateShotTagsAsync(shot.DirectoryName, tags);
+        }
+        shot.Tags = tags;
+    }
+
     public IEnumerable<DateTime> GetUniqueDates()
     {
         if (_cachedShots == null)

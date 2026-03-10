@@ -45,13 +45,22 @@
                    TextWrapping="Wrap"
                    Margin="0,0,0,24"/>
 
-        <!-- OK Button -->
-        <Button x:Name="OkButton"
-                Grid.Row="2"
-                Content="OK"
-                Click="OkButton_Click"
-                Style="{StaticResource MaterialDesignRaisedButton}"
-                HorizontalAlignment="Right"
-                MinWidth="80"/>
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button x:Name="CancelButton"
+                    Content="Cancel"
+                    Click="CancelButton_Click"
+                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                    Visibility="Collapsed"
+                    MinWidth="80"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="OkButton"
+                    Content="OK"
+                    Click="OkButton_Click"
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    MinWidth="80"/>
+        </StackPanel>
     </Grid>
 </Window>

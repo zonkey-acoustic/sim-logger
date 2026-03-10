@@ -1,22 +1,17 @@
 # Sim Logger
 
-A Windows desktop application for viewing and exporting golf shot data from [GSPro](https://gsprogolf.com/) golf simulator. Additional features include the ability to trigger third party swing recording software as well as AI shot analysis using your AI Assistant of choice via the provided MCP server.
+A Windows desktop application for viewing and exporting golf shot data from [GSPro](https://gsprogolf.com/) golf simulator. Additional features include the ability to analyze your data using your AI Assistant of choice via the provided MCP server.
 
 ![SimLogger Screenshot](screenshot.png)  
 
 ## Features
 
 ### Shot Management
-- **Real-time monitoring** - Detects shots instantly via network traffic monitoring (requires Npcap)
-- **File monitoring fallback** - Falls back to database polling when real-time is disabled
+
 - **Shot list view** - Browse all shots with club, ball speed, carry distance, etc.
 
-### Swing Recording - Audio & Network Trigger
-- **Audio Trigger** - Allows you to trigger swing recording software like [Kinovea](https://www.kinovea.org/) or [Swing Catalyst](https://swingcatalyst.com/) using the audio trigger option and by listening to the virtual audio cable output. 
-- **Network Trigger** - Use the new network trigger option in Kinovea 2025.1.1
-- **Device selection** - Route audio to any output device (useful for [virtual audio cables](https://vb-audio.com/Cable/))
-
-### Export
+### Inport/Export
+- **CSV import** - Import CSV exports from GSPro for analysis
 - **CSV export** - Export synced shots to CSV for analysis in Excel or other tools
 - **Shot Pattern export** - Export synced shots to a CSV format compatible with the [Shot Pattern](https://shotpattern.app/) app.
 
@@ -75,37 +70,12 @@ A Windows desktop application for viewing and exporting golf shot data from [GSP
    - "Show me my driver statistics"
    - "Compare my 7 iron to my 8 iron"
 
-## Real-time Shot Detection Setup
 
-Real-time monitoring captures network traffic between your launch monitor software and GSPro, triggering audio/network notifications the instant a shot is detected - before GSPro writes to its database. This is essential for accurate swing recording synchronization.
-
-### Requirements for Real-time Monitoring
-1. **Install Npcap** - Download from [npcap.com](https://npcap.com/) (free for personal use)
-   - During installation, select "Install Npcap in WinPcap API-compatible Mode"
-2. **Run as Administrator** - SimLogger requires admin privileges for packet capture
-
-### Configuration
-1. Enable the **Realtime** toggle in the settings bar
-2. Click the signal icon to configure the GSPro API port:
-   - **Port 12321** - ProTee VX / ProTee Labs connector (default)
-   - **Port 921** - OpenConnect API (other launch monitors)
-3. Restart SimLogger for changes to take effect
-
-The status bar shows the current monitoring mode:
-- **Real-time** - Active packet monitoring on the configured port
-- **File monitoring** - Fallback mode using database polling (triggers disabled)
-
-> **Note:** Audio and Network triggers only fire in Real-time mode. File monitoring mode only updates the shot list.
 
 ## Requirements
 
 - Windows 10/11 x64
 - [GSPro Golf Simulator](https://gsprogolf.com/)
-- Launch monitor connected to GSPro (e.g., [ProTee VX](https://proteelaunchmonitors.com/))
-- Optional: [Npcap](https://npcap.com/) - Required for real-time shot detection
-- Optional: [Kinovea](https://www.kinovea.org/) or [Swing Catalyst](https://swingcatalyst.com/)
-- Optional: [VB-Cable Virtual Audio Device](https://vb-audio.com/Cable/)
-
 
 ## Installation
 

@@ -46,7 +46,8 @@ public class ShotDataExporter
                 "CR",
                 "HI",
                 "VI",
-                "SmashFactor"
+                "SmashFactor",
+                "Tags"
             ));
 
             // Write data rows with raw numeric values
@@ -105,7 +106,8 @@ public class ShotDataExporter
                     "", // CR - not available, leave blank
                     FormatGSProValue(hi),
                     FormatGSProValue(vi),
-                    FormatGSProValue(smashFactor)
+                    FormatGSProValue(smashFactor),
+                    EscapeCsv(string.Join(";", shot.Tags))
                 ));
             }
 

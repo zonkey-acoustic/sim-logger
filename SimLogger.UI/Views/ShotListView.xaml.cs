@@ -2,11 +2,11 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
+
 using System.Windows.Data;
 using System.Windows.Media;
 using SimLogger.Core.Models;
-using SimLogger.UI.Services;
+
 using SimLogger.UI.ViewModels;
 
 namespace SimLogger.UI.Views;
@@ -16,11 +16,10 @@ public partial class ShotListView : UserControl
     // Events for MainWindow to subscribe to
     public event RoutedEventHandler? SyncButtonClick;
     public event RoutedEventHandler? CancelSyncButtonClick;
-    public event RoutedEventHandler? ShotTriggerToggleChanged;
-    public event RoutedEventHandler? ShotTriggerConfigButtonClick;
     public event RoutedEventHandler? ExportCsvButtonClick;
     public event RoutedEventHandler? DataStorageButtonClick;
     public event RoutedEventHandler? GSProPathButtonClick;
+    public event RoutedEventHandler? ImportCsvButtonClick;
 
     // Event for column reorder to save preferences
     public event EventHandler<List<string>>? ColumnOrderChanged;
@@ -28,6 +27,12 @@ public partial class ShotListView : UserControl
     // Event for column visibility changes
     public event EventHandler<List<string>>? ColumnVisibilityChanged;
     public event RoutedEventHandler? ColumnsButtonClick;
+
+    // Event for tag editing
+    public event EventHandler<List<ShotData>>? EditTagsRequested;
+
+    // Event for shot deletion
+    public event EventHandler<List<ShotData>>? DeleteShotsRequested;
 
     public ShotListView()
     {
@@ -281,26 +286,14 @@ public partial class ShotListView : UserControl
 
     // Expose controls for MainWindow to update
     public Button SyncButtonControl => SyncButton;
-    public TextBlock StatusTextControl => StatusText;
     public StackPanel SyncProgressPanelControl => SyncProgressPanel;
     public ProgressBar SyncProgressBarControl => SyncProgressBar;
     public TextBlock SyncStatusTextControl => SyncStatusText;
     public Button CancelSyncButtonControl => CancelSyncButton;
-    public ToggleButton ShotTriggerToggleControl => ShotTriggerToggle;
-    public TextBlock ShotTriggerLabelControl => ShotTriggerLabel;
-    public Button ShotTriggerConfigButtonControl => ShotTriggerConfigButton;
     public Button ExportCsvButtonControl => ExportCsvButton;
     public Button DataStorageButtonControl => DataStorageButton;
     public Button GSProPathButtonControl => GSProPathButton;
-    public TextBlock MonitoringModeTextControl => MonitoringModeText;
 
-    public void SetShotTriggerTooltip(bool isAudio, string? detail)
-    {
-        var triggerType = isAudio ? "Audio" : "Network";
-        ShotTriggerConfigButton.ToolTip = string.IsNullOrEmpty(detail)
-            ? "Configure shot trigger"
-            : $"{triggerType} trigger: {detail}\nClick to configure";
-    }
 
     public void SetDataStorageTooltip(string? path)
     {
@@ -395,16 +388,6 @@ public partial class ShotListView : UserControl
         CancelSyncButtonClick?.Invoke(sender, e);
     }
 
-    private void ShotTriggerToggle_Changed(object sender, RoutedEventArgs e)
-    {
-        ShotTriggerToggleChanged?.Invoke(sender, e);
-    }
-
-    private void ShotTriggerConfigButton_Click(object sender, RoutedEventArgs e)
-    {
-        ShotTriggerConfigButtonClick?.Invoke(sender, e);
-    }
-
     private void ExportCsvButton_Click(object sender, RoutedEventArgs e)
     {
         ExportCsvButtonClick?.Invoke(sender, e);
@@ -423,6 +406,46 @@ public partial class ShotListView : UserControl
     private void ColumnsButton_Click(object sender, RoutedEventArgs e)
     {
         ColumnsButtonClick?.Invoke(sender, e);
+    }
+
+    private void ImportCsvButton_Click(object sender, RoutedEventArgs e)
+    {
+        ImportCsvButtonClick?.Invoke(sender, e);
+    }
+
+    private void EditTags_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ShotListViewModel vm)
+        {
+            // Use selected shots if any, otherwise use the single selected shot
+            var shots = vm.SelectedShots.Count > 0
+                ? vm.SelectedShots.ToList()
+                : vm.SelectedShot != null
+                    ? new List<ShotData> { vm.SelectedShot }
+                    : new List<ShotData>();
+
+            if (shots.Count > 0)
+            {
+                EditTagsRequested?.Invoke(this, shots);
+            }
+        }
+    }
+
+    private void DeleteShots_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ShotListViewModel vm)
+        {
+            var shots = vm.SelectedShots.Count > 0
+                ? vm.SelectedShots.ToList()
+                : vm.SelectedShot != null
+                    ? new List<ShotData> { vm.SelectedShot }
+                    : new List<ShotData>();
+
+            if (shots.Count > 0)
+            {
+                DeleteShotsRequested?.Invoke(this, shots);
+            }
+        }
     }
 
     public List<string> GetAllColumnHeaders()

@@ -61,6 +61,12 @@ public partial class MessageDialog : Window
         Close();
     }
 
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+        Close();
+    }
+
     public static void Show(Window owner, string title, string message, MessageDialogType type = MessageDialogType.Information)
     {
         var dialog = new MessageDialog(title, message, type)
@@ -68,5 +74,16 @@ public partial class MessageDialog : Window
             Owner = owner
         };
         dialog.ShowDialog();
+    }
+
+    public static bool Confirm(Window owner, string title, string message, MessageDialogType type = MessageDialogType.Warning)
+    {
+        var dialog = new MessageDialog(title, message, type)
+        {
+            Owner = owner
+        };
+        dialog.CancelButton.Visibility = Visibility.Visible;
+        dialog.OkButton.Content = "Delete";
+        return dialog.ShowDialog() == true;
     }
 }

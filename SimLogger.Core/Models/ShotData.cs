@@ -24,6 +24,10 @@ public class ShotData
 
     // Indicates whether the shot has been synced to the database
     public bool IsSynced { get; set; }
+
+    // User-defined tags for categorization
+    public List<string> Tags { get; set; } = new();
+    public string TagsDisplay => string.Join(", ", Tags);
 }
 
 public class ClubData

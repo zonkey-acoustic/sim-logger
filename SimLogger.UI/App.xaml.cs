@@ -5,24 +5,20 @@ namespace SimLogger.UI;
 
 public partial class App : Application
 {
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         // Check for MCP mode
         if (e.Args.Contains("--mcp") || e.Args.Contains("--mcp-mode"))
         {
             // Run as MCP server only (no WPF UI)
-            // This prevents the normal WPF startup
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            try
-            {
-                var dataStoragePath = McpServerRunner.GetDataStoragePathFromSettings();
-                await McpServerRunner.RunAsync(dataStoragePath);
-            }
-            finally
-            {
-                Shutdown();
-            }
+            var dataStoragePath = McpServerRunner.GetDataStoragePathFromSettings();
+
+            // Run synchronously to keep the process alive for the MCP server
+            McpServerRunner.RunAsync(dataStoragePath).GetAwaiter().GetResult();
+
+            Shutdown();
             return;
         }
 

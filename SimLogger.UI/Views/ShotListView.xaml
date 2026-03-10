@@ -36,6 +36,12 @@
                       SelectedItem="{Binding SelectedClubFilter}"
                       Style="{StaticResource MaterialDesignOutlinedComboBox}"
                       materialDesign:HintAssist.Hint="Filter by Club"/>
+
+            <ComboBox Grid.Column="2"
+                      ItemsSource="{Binding TagFilters}"
+                      SelectedItem="{Binding SelectedTagFilter}"
+                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                      materialDesign:HintAssist.Hint="Filter by Tag"/>
         </Grid>
 
         <!-- Shot Grid -->
@@ -53,6 +59,22 @@
                   CanUserSortColumns="True"
                   HeadersVisibility="Column"
                   ColumnWidth="SizeToCells">
+
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Edit Tags..." Click="EditTags_Click">
+                        <MenuItem.Icon>
+                            <materialDesign:PackIcon Kind="Tag"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator/>
+                    <MenuItem Header="Delete" Click="DeleteShots_Click">
+                        <MenuItem.Icon>
+                            <materialDesign:PackIcon Kind="Delete"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
 
             <!-- Remove cell focus border -->
             <DataGrid.CellStyle>
@@ -89,6 +111,10 @@
 
                 <DataGridTextColumn Header="Club"
                                     Binding="{Binding ClubData.ClubName}"
+                                    Width="Auto"/>
+
+                <DataGridTextColumn Header="Tags"
+                                    Binding="{Binding TagsDisplay}"
                                     Width="Auto"/>
 
                 <DataGridTextColumn Header="To Pin"
@@ -293,12 +319,7 @@
                     <Button x:Name="SyncButton"
                             Content="Sync All"
                             Style="{StaticResource MaterialDesignRaisedButton}"
-                            Click="SyncButton_Click"
-                            Margin="0,0,8,0"/>
-                    <Button x:Name="ExportCsvButton"
-                            Content="Export All"
-                            Style="{StaticResource MaterialDesignRaisedButton}"
-                            Click="ExportCsvButton_Click"/>
+                            Click="SyncButton_Click"/>
                 </StackPanel>
 
                 <!-- Right: Sync progress panel (shown during sync) -->
@@ -334,46 +355,14 @@
                     Padding="12,8"
                     Background="{DynamicResource MaterialDesign.Brush.Card.Background}"
                     CornerRadius="4">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Settings label -->
-                    <TextBlock Grid.Column="0"
-                               Text="SETTINGS"
-                               Style="{StaticResource MaterialDesignOverlineTextBlock}"
-                               VerticalAlignment="Center"
-                               Opacity="0.5"
-                               Margin="0,0,24,0"/>
-
-                    <!-- Center: Toggle switches -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ToggleButton x:Name="ShotTriggerToggle"
-                                      Style="{StaticResource MaterialDesignSwitchToggleButton}"
-                                      IsChecked="False"
-                                      Checked="ShotTriggerToggle_Changed"
-                                      Unchecked="ShotTriggerToggle_Changed"
-                                      VerticalAlignment="Center"/>
-                        <TextBlock x:Name="ShotTriggerLabel"
-                                   Text="Shot Trigger"
-                                   Style="{StaticResource MaterialDesignBody2TextBlock}"
-                                   Opacity="0.7"
-                                   Margin="8,0,4,0"
-                                   VerticalAlignment="Center"/>
-                        <Button x:Name="ShotTriggerConfigButton"
-                                Style="{StaticResource MaterialDesignIconButton}"
-                                Click="ShotTriggerConfigButton_Click"
-                                ToolTip="Configure shot trigger"
-                                Width="32" Height="32"
-                                Padding="4">
-                            <materialDesign:PackIcon Kind="Cog" Width="18" Height="18"/>
-                        </Button>
-
-                        <Rectangle Width="1" Fill="{DynamicResource MaterialDesignDivider}" Margin="16,4"/>
-
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Settings label -->
+                        <TextBlock Text="SETTINGS"
+                                   Style="{StaticResource MaterialDesignOverlineTextBlock}"
+                                   VerticalAlignment="Center"
+                                   Opacity="0.5"
+                                   Margin="0,0,24,0"/>
                         <TextBlock Text="GSPro"
                                    Style="{StaticResource MaterialDesignBody2TextBlock}"
                                    Opacity="0.7"
@@ -419,34 +408,42 @@
                                 Padding="4">
                             <materialDesign:PackIcon Kind="TableColumn" Width="18" Height="18"/>
                         </Button>
+
+                        <Rectangle Width="1" Fill="{DynamicResource MaterialDesignDivider}" Margin="16,4"/>
+
+                        <TextBlock Text="Export"
+                                   Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                   Opacity="0.7"
+                                   Margin="0,0,4,0"
+                                   VerticalAlignment="Center"/>
+                        <Button x:Name="ExportCsvButton"
+                                Style="{StaticResource MaterialDesignIconButton}"
+                                Click="ExportCsvButton_Click"
+                                ToolTip="Export shots to CSV"
+                                Width="32" Height="32"
+                                Padding="4">
+                            <materialDesign:PackIcon Kind="FileExport" Width="18" Height="18"/>
+                        </Button>
+
+                        <Rectangle Width="1" Fill="{DynamicResource MaterialDesignDivider}" Margin="16,4"/>
+
+                        <TextBlock Text="Import"
+                                   Style="{StaticResource MaterialDesignBody2TextBlock}"
+                                   Opacity="0.7"
+                                   Margin="0,0,4,0"
+                                   VerticalAlignment="Center"/>
+                        <Button x:Name="ImportCsvButton"
+                                Style="{StaticResource MaterialDesignIconButton}"
+                                Click="ImportCsvButton_Click"
+                                ToolTip="Import shots from GSPro CSV file"
+                                Width="32" Height="32"
+                                Padding="4">
+                            <materialDesign:PackIcon Kind="FileImport" Width="18" Height="18"/>
+                        </Button>
                     </StackPanel>
-                </Grid>
+                </ScrollViewer>
             </Border>
 
-            <!-- Row 2: Status bar -->
-            <Grid Grid.Row="2" Margin="0,8,0,0">
-                <StackPanel Orientation="Horizontal">
-                    <Ellipse x:Name="MonitoringIndicator"
-                             Width="8" Height="8"
-                             Fill="#4CAF50"
-                             VerticalAlignment="Center"/>
-                    <TextBlock x:Name="MonitoringModeText"
-                               Text="File monitoring"
-                               Style="{StaticResource MaterialDesignCaptionTextBlock}"
-                               Opacity="0.5"
-                               Margin="6,0,12,0"
-                               VerticalAlignment="Center"/>
-                    <TextBlock Text="|"
-                               Opacity="0.3"
-                               Margin="0,0,12,0"
-                               VerticalAlignment="Center"/>
-                    <TextBlock x:Name="StatusText"
-                               Text="Ready"
-                               Style="{StaticResource MaterialDesignCaptionTextBlock}"
-                               Opacity="0.7"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-            </Grid>
         </Grid>
     </Grid>
 </UserControl>

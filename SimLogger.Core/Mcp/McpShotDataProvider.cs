@@ -30,7 +30,7 @@ public class McpShotDataProvider
 
         var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT s.ShotNumber, s.DateTime, s.SmashFactor, s.DistanceToTarget,
+            SELECT s.ShotNumber, s.DateTime, s.SmashFactor, s.DistanceToTarget, s.Tags,
                    c.ClubName, c.Speed as ClubSpeed,
                    b.Speed as BallSpeed, b.LaunchAngle,
                    f.Carry, f.TotalDistance
@@ -100,6 +100,12 @@ public class McpShotDataProvider
             command.Parameters.AddWithValue("@clubName", $"%{criteria.ClubName}%");
         }
 
+        if (!string.IsNullOrWhiteSpace(criteria.Tag))
+        {
+            conditions.Add("s.Tags LIKE @tag");
+            command.Parameters.AddWithValue("@tag", $"%{criteria.Tag}%");
+        }
+
         if (criteria.StartDate.HasValue)
         {
             conditions.Add("s.DateTime >= @startDate");
@@ -127,7 +133,7 @@ public class McpShotDataProvider
         var whereClause = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         command.CommandText = $"""
-            SELECT s.ShotNumber, s.DateTime, s.SmashFactor, s.DistanceToTarget,
+            SELECT s.ShotNumber, s.DateTime, s.SmashFactor, s.DistanceToTarget, s.Tags,
                    c.ClubName, c.Speed as ClubSpeed,
                    b.Speed as BallSpeed, b.LaunchAngle,
                    f.Carry, f.TotalDistance
@@ -327,6 +333,11 @@ public class McpShotDataProvider
 
     private static ShotSummary ReadShotSummary(SqliteDataReader reader, int shotNumber)
     {
+        var tagsRaw = GetStringOrDefault(reader, "Tags");
+        var tags = string.IsNullOrEmpty(tagsRaw)
+            ? new List<string>()
+            : tagsRaw.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToList();
+
         return new ShotSummary(
             shotNumber,
             reader.IsDBNull(reader.GetOrdinal("DateTime"))
@@ -341,7 +352,8 @@ public class McpShotDataProvider
             GetStringOrEmpty(reader, "SmashFactor"),
             reader.IsDBNull(reader.GetOrdinal("DistanceToTarget"))
                 ? null
-                : reader.GetDouble(reader.GetOrdinal("DistanceToTarget"))
+                : reader.GetDouble(reader.GetOrdinal("DistanceToTarget")),
+            tags
         );
     }
 
@@ -350,6 +362,10 @@ public class McpShotDataProvider
         // Read main shot data
         var dateTime = DateTime.Parse(reader.GetString(reader.GetOrdinal("DateTime")));
         var smashFactor = GetStringOrEmpty(reader, "SmashFactor");
+        var tagsRaw = GetStringOrDefault(reader, "Tags");
+        var tags = string.IsNullOrEmpty(tagsRaw)
+            ? new List<string>()
+            : tagsRaw.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToList();
         double? distanceToTarget = null;
         try
         {
@@ -435,6 +451,7 @@ public class McpShotDataProvider
             smashFactor,
             distanceToTarget,
             sessionId,
+            tags,
             club,
             ball,
             flight,

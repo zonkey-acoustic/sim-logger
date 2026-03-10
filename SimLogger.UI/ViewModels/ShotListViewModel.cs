@@ -22,6 +22,12 @@ public partial class ShotListViewModel : ObservableObject
     private string _selectedClubFilter = "All Clubs";
 
     [ObservableProperty]
+    private ObservableCollection<string> _tagFilters = new() { "All Tags" };
+
+    [ObservableProperty]
+    private string _selectedTagFilter = "All Tags";
+
+    [ObservableProperty]
     private ShotData? _selectedShot;
 
     [ObservableProperty]
@@ -84,10 +90,25 @@ public partial class ShotListViewModel : ObservableObject
         // Ensure "All Clubs" is selected after rebuilding the filter list
         SelectedClubFilter = "All Clubs";
 
+        // Update tag filters
+        var tags = _shotDataService.GetUniqueTags().ToList();
+        TagFilters.Clear();
+        TagFilters.Add("All Tags");
+        foreach (var tag in tags)
+        {
+            TagFilters.Add(tag);
+        }
+        SelectedTagFilter = "All Tags";
+
         ApplyFilters();
     }
 
     partial void OnSelectedClubFilterChanged(string value)
+    {
+        ApplyFilters();
+    }
+
+    partial void OnSelectedTagFilterChanged(string value)
     {
         ApplyFilters();
     }
@@ -100,6 +121,12 @@ public partial class ShotListViewModel : ObservableObject
         if (!string.IsNullOrEmpty(SelectedClubFilter) && SelectedClubFilter != "All Clubs")
         {
             filtered = filtered.Where(s => s.ClubData?.ClubName == SelectedClubFilter);
+        }
+
+        // Filter by tag
+        if (!string.IsNullOrEmpty(SelectedTagFilter) && SelectedTagFilter != "All Tags")
+        {
+            filtered = filtered.Where(s => s.Tags.Contains(SelectedTagFilter));
         }
 
         // Store filtered results for pagination

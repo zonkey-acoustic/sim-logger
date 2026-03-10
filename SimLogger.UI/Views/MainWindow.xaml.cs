@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Interop;
 using SimLogger.Core.Models;
 using SimLogger.Core.Exporters;
+using SimLogger.Core.Importers;
 using SimLogger.Core.Services;
 using SimLogger.UI.Services;
 using SimLogger.UI.ViewModels;
@@ -17,13 +18,7 @@ public partial class MainWindow : Window
     private readonly SyncViewModel _syncViewModel;
     private readonly SyncService _syncService;
     private readonly FileWatcherService _fileWatcher;
-    private readonly GSProTrafficMonitor? _trafficMonitor;
-    private readonly AudioTriggerService _audioTriggerService;
-    private readonly NetworkTriggerService _networkTriggerService;
-
-    // Deduplication: track recent trigger timestamps to prevent double-firing
-    private DateTime _lastTriggerTime = DateTime.MinValue;
-    private readonly TimeSpan _triggerDebounceInterval = TimeSpan.FromMilliseconds(500);
+    private readonly SettingsService _settingsService;
 
     // Windows DWM API for dark title bar
     [DllImport("dwmapi.dll", PreserveSig = true)]
@@ -43,33 +38,11 @@ public partial class MainWindow : Window
             DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref value, sizeof(int));
         };
 
-        // Initialize audio/settings service first to get data storage path
-        _audioTriggerService = new AudioTriggerService();
-
-        // Initialize network trigger service
-        _networkTriggerService = new NetworkTriggerService
-        {
-            IsEnabled = _audioTriggerService.NetworkTriggerEnabled,
-            Port = _audioTriggerService.NetworkTriggerPort,
-            TargetHost = _audioTriggerService.NetworkTriggerHost
-        };
-
-        // Initialize real-time traffic monitor (only if shot trigger is enabled)
-        var shouldStartMonitor = (_audioTriggerService.IsEnabled || _audioTriggerService.NetworkTriggerEnabled)
-                                 && _audioTriggerService.RealtimeDetectionEnabled
-                                 && GSProTrafficMonitor.IsNpcapInstalled();
-        if (shouldStartMonitor)
-        {
-            _trafficMonitor = new GSProTrafficMonitor
-            {
-                GSProPort = _audioTriggerService.GSProApiPort
-            };
-            _trafficMonitor.ShotDetected += OnTrafficShotDetected;
-            _trafficMonitor.Error += OnTrafficMonitorError;
-        }
+        // Initialize settings service
+        _settingsService = new SettingsService();
 
         // Initialize shot data service with configured data storage path and GSPro path
-        _shotDataService = new ShotDataService(_audioTriggerService.DataStoragePath, _audioTriggerService.GetGSProDatabasePath());
+        _shotDataService = new ShotDataService(_settingsService.DataStoragePath, _settingsService.GetGSProDatabasePath());
         _shotListViewModel = new ShotListViewModel(_shotDataService);
 
         // Initialize sync service and view model
@@ -83,24 +56,16 @@ public partial class MainWindow : Window
         _shotListViewModel.SelectedShots.CollectionChanged += OnSelectedShotsChanged;
         _shotListViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
-        // Set initial toggle states from saved settings BEFORE wiring up events
-        // Shot trigger is on if either audio or network trigger is enabled
-        var shotTriggerEnabled = _audioTriggerService.IsEnabled || _audioTriggerService.NetworkTriggerEnabled;
-        ShotListView.ShotTriggerToggleControl.IsChecked = shotTriggerEnabled;
-        UpdateShotTriggerLabel();
-        ShotListView.SetDataStorageTooltip(_audioTriggerService.DataStoragePath);
-        ShotListView.SetGSProPathTooltip(_audioTriggerService.GSProPath);
+        ShotListView.SetDataStorageTooltip(_settingsService.DataStoragePath);
+        ShotListView.SetGSProPathTooltip(_settingsService.GSProPath);
 
         // Wire up sync button events from ShotListView
         ShotListView.SyncButtonClick += SyncButton_Click;
         ShotListView.CancelSyncButtonClick += CancelSyncButton_Click;
 
-        // Wire up shot trigger events
-        ShotListView.ShotTriggerToggleChanged += ShotTriggerToggle_Changed;
-        ShotListView.ShotTriggerConfigButtonClick += ShotTriggerConfigButton_Click;
-
-        // Wire up export event
+        // Wire up export/import events
         ShotListView.ExportCsvButtonClick += ExportCsvButton_Click;
+        ShotListView.ImportCsvButtonClick += ImportCsvButton_Click;
 
         // Wire up data storage event
         ShotListView.DataStorageButtonClick += DataStorageButton_Click;
@@ -115,12 +80,18 @@ public partial class MainWindow : Window
         ShotListView.ColumnsButtonClick += ColumnsButton_Click;
         ShotListView.ColumnVisibilityChanged += OnColumnVisibilityChanged;
 
+        // Wire up tag editing event
+        ShotListView.EditTagsRequested += EditTags_Requested;
+
+        // Wire up shot deletion event
+        ShotListView.DeleteShotsRequested += DeleteShots_Requested;
+
         // Wire up sync events
         _syncService.ProgressChanged += OnSyncProgressChanged;
         _syncViewModel.SyncCompleted += OnSyncCompleted;
 
-        // Initialize GSPro database watcher for real-time shot detection
-        _fileWatcher = new FileWatcherService(_audioTriggerService.GetGSProDatabasePath());
+        // Initialize GSPro database watcher for shot detection
+        _fileWatcher = new FileWatcherService(_settingsService.GetGSProDatabasePath());
         _fileWatcher.NewShotDetected += OnNewShotDetected;
 
         // Load data on startup
@@ -130,82 +101,52 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         // Apply saved column order and visibility
-        ShotListView.ApplyColumnOrder(_audioTriggerService.ColumnOrder);
-        ShotListView.ApplyColumnVisibility(_audioTriggerService.HiddenColumns);
+        ShotListView.ApplyColumnOrder(_settingsService.ColumnOrder);
+        ShotListView.ApplyColumnVisibility(_settingsService.HiddenColumns);
 
         await LoadShotsAsync();
 
         // Sync any existing unsynced shots from GSPro on startup
         await InitialSyncAsync();
 
-        // Start traffic monitor for real-time shot detection (if available)
-        if (_trafficMonitor != null)
-        {
-            try
-            {
-                _trafficMonitor.Start();
-                ShotListView.MonitoringModeTextControl.Text = "Real-time";
-                ShotListView.StatusTextControl.Text = $"Monitoring port {_audioTriggerService.GSProApiPort}";
-                // Skip file watcher when using real-time detection
-            }
-            catch (Exception ex)
-            {
-                ShotListView.MonitoringModeTextControl.Text = "File monitoring";
-                ShotListView.StatusTextControl.Text = $"Real-time failed: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"Traffic monitor failed to start: {ex.Message}");
-                // Fall back to file watcher if traffic monitor fails
-                _fileWatcher.Start();
-            }
-        }
-        else
-        {
-            // Use file watcher as fallback when real-time detection is not available
-            ShotListView.MonitoringModeTextControl.Text = "File monitoring";
-            _fileWatcher.Start();
-        }
+        // Start file watcher for shot detection
+        _fileWatcher.Start();
     }
 
     private async Task InitialSyncAsync()
     {
         try
         {
-            ShotListView.StatusTextControl.Text = "Syncing shots from GSPro...";
             var result = await Task.Run(() => _syncService.SyncAsync(CancellationToken.None));
 
             if (result.ShotsProcessed > 0)
             {
-                ShotListView.StatusTextControl.Text = $"Synced {result.ShotsProcessed} shot(s) from GSPro";
                 _shotDataService.ClearCache();
                 await LoadShotsAsync();
-            }
-            else
-            {
-                ShotListView.StatusTextControl.Text = "Ready";
             }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Initial sync failed: {ex.Message}");
-            ShotListView.StatusTextControl.Text = "Ready";
         }
     }
 
     private void OnColumnOrderChanged(object? sender, List<string> columnOrder)
     {
-        _audioTriggerService.ColumnOrder = columnOrder;
-        _audioTriggerService.SaveSettings();
+        _settingsService.ColumnOrder = columnOrder;
+        _settingsService.SaveSettings();
     }
 
     private void OnColumnVisibilityChanged(object? sender, List<string> hiddenColumns)
     {
-        _audioTriggerService.HiddenColumns = hiddenColumns;
-        _audioTriggerService.SaveSettings();
+        _settingsService.HiddenColumns = hiddenColumns;
+        _settingsService.SaveSettings();
     }
 
     private void ColumnsButton_Click(object? sender, RoutedEventArgs e)
     {
         var allColumns = ShotListView.GetAllColumnHeaders();
-        var dialog = new ColumnVisibilityDialog(allColumns, _audioTriggerService.HiddenColumns)
+        var dialog = new ColumnVisibilityDialog(allColumns, _settingsService.HiddenColumns)
         {
             Owner = this
         };
@@ -216,19 +157,96 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void EditTags_Requested(object? sender, List<ShotData> shots)
+    {
+        // Only allow tag editing on synced shots
+        var syncedShots = shots.Where(s => s.IsSynced).ToList();
+        if (syncedShots.Count == 0)
+        {
+            MessageDialog.Show(this, "Edit Tags",
+                "Tags can only be added to synced shots.\nPlease sync the shot(s) first.",
+                MessageDialogType.Information);
+            return;
+        }
+
+        // For bulk editing, start with common tags across all selected shots
+        var commonTags = syncedShots.Count == 1
+            ? syncedShots[0].Tags.ToList()
+            : syncedShots
+                .Select(s => s.Tags.AsEnumerable())
+                .Aggregate((a, b) => a.Intersect(b))
+                .ToList();
+
+        var allTags = _shotDataService.GetUniqueTags().ToList();
+        var dialog = new TagEditorDialog(commonTags, allTags)
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            foreach (var shot in syncedShots)
+            {
+                await _shotDataService.UpdateShotTagsAsync(shot, dialog.ResultTags.ToList());
+            }
+            await _shotListViewModel.RefreshAsync();
+        }
+    }
+
+    private async void DeleteShots_Requested(object? sender, List<ShotData> shots)
+    {
+        var syncedShots = shots.Where(s => s.IsSynced).ToList();
+        if (syncedShots.Count == 0)
+        {
+            MessageDialog.Show(this, "Delete Shots",
+                "Only synced shots can be deleted from the database.",
+                MessageDialogType.Information);
+            return;
+        }
+
+        var shotWord = syncedShots.Count == 1 ? "shot" : "shots";
+        var confirmed = MessageDialog.Confirm(this, "Delete Shots",
+            $"Are you sure you want to delete {syncedShots.Count} {shotWord} from the database?\n\nThis action cannot be undone.",
+            MessageDialogType.Warning);
+
+        if (!confirmed)
+            return;
+
+        var errors = new List<string>();
+        foreach (var shot in syncedShots)
+        {
+            try
+            {
+                await _shotDataService.Repository.DeleteShotByDirectoryNameAsync(shot.DirectoryName);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Shot #{shot.ShotNumber}: {ex.Message}");
+            }
+        }
+
+        _shotDataService.ClearCache();
+        _shotListViewModel.ClearSelectionCommand.Execute(null);
+        await LoadShotsAsync();
+
+        if (errors.Count > 0)
+        {
+            MessageDialog.Show(this, "Delete Errors",
+                $"Deleted {syncedShots.Count - errors.Count} shot(s) but {errors.Count} failed:\n{string.Join("\n", errors)}",
+                MessageDialogType.Error);
+        }
+    }
+
     private async Task LoadShotsAsync()
     {
-        ShotListView.StatusTextControl.Text = "Loading shots...";
         try
         {
             await _shotListViewModel.RefreshAsync();
-            ShotListView.StatusTextControl.Text = "Ready";
             UpdateSyncButtonState();
             UpdateExportButtonState();
         }
         catch (Exception ex)
         {
-            ShotListView.StatusTextControl.Text = $"Error: {ex.Message}";
             MessageDialog.Show(this, "Error", $"Error loading shots: {ex.Message}", MessageDialogType.Error);
         }
     }
@@ -241,8 +259,6 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        // Only update button states when Shots property changes, not when filter changes
-        // (filter change triggers Shots change, so we avoid updating with stale data)
         if (e.PropertyName == nameof(ShotListViewModel.Shots))
         {
             UpdateSyncButtonState();
@@ -252,19 +268,16 @@ public partial class MainWindow : Window
 
     private void UpdateSyncButtonState()
     {
-        // Sync button is hidden - all shots are automatically synced
         ShotListView.SyncButtonControl.Visibility = Visibility.Collapsed;
     }
 
     private async void SyncButton_Click(object? sender, RoutedEventArgs e)
     {
-        // This is now only used for manual sync if needed
         await PerformSyncAsync();
     }
 
     private async Task PerformSyncAsync()
     {
-        // Show sync progress UI
         ShotListView.SyncButtonControl.IsEnabled = false;
         ShotListView.SyncProgressPanelControl.Visibility = Visibility.Visible;
         ShotListView.SyncProgressBarControl.Value = 0;
@@ -273,12 +286,10 @@ public partial class MainWindow : Window
         var selectedShots = _shotListViewModel.SelectedShots;
         if (selectedShots.Count > 0)
         {
-            // Sync only selected shots
             await SyncSelectedShotsAsync(selectedShots.ToList());
         }
         else
         {
-            // Sync all unsynced shots
             await _syncViewModel.SyncCommand.ExecuteAsync(null);
         }
     }
@@ -290,19 +301,16 @@ public partial class MainWindow : Window
 
         if (selectedShots.Count > 0)
         {
-            // Unsync selected shots
             syncedShots = selectedShots.Where(s => s.IsSynced).ToList();
         }
         else
         {
-            // Unsync all visible shots
             syncedShots = _shotListViewModel.Shots.Where(s => s.IsSynced).ToList();
         }
 
         if (syncedShots.Count == 0)
             return;
 
-        // Show progress
         ShotListView.SyncButtonControl.IsEnabled = false;
         ShotListView.SyncProgressPanelControl.Visibility = Visibility.Visible;
         ShotListView.SyncProgressBarControl.Value = 0;
@@ -310,33 +318,19 @@ public partial class MainWindow : Window
 
         try
         {
-            var unsyncResult = await Task.Run(() => _syncService.UnsyncAsync(syncedShots));
-
-            if (unsyncResult.Success)
-            {
-                ShotListView.StatusTextControl.Text = unsyncResult.ShotsRemoved == 1
-                    ? "Removed 1 shot from database"
-                    : $"Removed {unsyncResult.ShotsRemoved} shots from database";
-            }
-            else
-            {
-                ShotListView.StatusTextControl.Text = $"Unsync completed with {unsyncResult.Errors.Count} error(s)";
-            }
+            await Task.Run(() => _syncService.UnsyncAsync(syncedShots));
         }
         catch (Exception ex)
         {
-            ShotListView.StatusTextControl.Text = $"Unsync failed: {ex.Message}";
             MessageDialog.Show(this, "Error", $"Error during unsync: {ex.Message}", MessageDialogType.Error);
         }
         finally
         {
             ShotListView.SyncProgressPanelControl.Visibility = Visibility.Collapsed;
 
-            // Refresh the shot list
             _shotDataService.ClearCache();
             await LoadShotsAsync();
 
-            // Clear the selection
             _shotListViewModel.ClearSelectionCommand.Execute(null);
         }
     }
@@ -374,14 +368,11 @@ public partial class MainWindow : Window
             {
                 ShotListView.SyncProgressPanelControl.Visibility = Visibility.Collapsed;
                 ShotListView.CancelSyncButtonControl.IsEnabled = true;
-                ShotListView.StatusTextControl.Text = _syncViewModel.SyncStatus;
             });
 
-            // Refresh the shot list
             _shotDataService.ClearCache();
             await LoadShotsAsync();
 
-            // Clear the selection after syncing (this will trigger UpdateSyncButtonState)
             _shotListViewModel.ClearSelectionCommand.Execute(null);
         }
     }
@@ -408,10 +399,8 @@ public partial class MainWindow : Window
         {
             ShotListView.SyncProgressPanelControl.Visibility = Visibility.Collapsed;
             ShotListView.CancelSyncButtonControl.IsEnabled = true;
-            ShotListView.StatusTextControl.Text = _syncViewModel.SyncStatus;
         });
 
-        // Refresh the shot list to show newly synced shots
         _shotDataService.ClearCache();
         await LoadShotsAsync();
     }
@@ -420,12 +409,8 @@ public partial class MainWindow : Window
     {
         await Dispatcher.InvokeAsync(async () =>
         {
-            ShotListView.StatusTextControl.Text = "New shot detected...";
             _shotDataService.ClearCache();
             await LoadShotsAsync();
-
-            // Note: Triggers are NOT fired here - database polling has delay issues.
-            // Triggers only fire from real-time traffic monitoring (OnTrafficShotDetected).
 
             // Auto-sync new shot to database
             if (e.Shot != null)
@@ -435,204 +420,24 @@ public partial class MainWindow : Window
         });
     }
 
-    private void OnTrafficShotDetected(object? sender, ShotTrafficDetectedEventArgs e)
-    {
-        Dispatcher.Invoke(() =>
-        {
-            ShotListView.StatusTextControl.Text = "Shot detected (real-time)!";
-
-            // Fire triggers immediately - this is the real-time path
-            FireTriggersIfNotRecent();
-        });
-    }
-
-    private void OnTrafficMonitorError(object? sender, TrafficMonitorErrorEventArgs e)
-    {
-        Dispatcher.Invoke(() =>
-        {
-            System.Diagnostics.Debug.WriteLine($"Traffic monitor error: {e.Message}");
-        });
-    }
-
-    /// <summary>
-    /// Fires audio and network triggers if not fired recently (debouncing).
-    /// Prevents double-firing when both traffic monitor and file watcher detect the same shot.
-    /// </summary>
-    private void FireTriggersIfNotRecent()
-    {
-        var now = DateTime.Now;
-        if (now - _lastTriggerTime < _triggerDebounceInterval)
-        {
-            // Already fired recently, skip to prevent double-triggering
-            return;
-        }
-
-        _lastTriggerTime = now;
-
-        // Play audio trigger if enabled
-        _audioTriggerService.PlayTriggerTone();
-
-        // Send network trigger if enabled
-        _networkTriggerService.SendTriggerPacket();
-    }
-
-    private void ShotTriggerToggle_Changed(object? sender, RoutedEventArgs e)
-    {
-        var isEnabled = ShotListView.ShotTriggerToggleControl.IsChecked == true;
-
-        if (isEnabled)
-        {
-            // Check if trigger is configured
-            var hasAudioConfig = _audioTriggerService.SelectedDeviceIndex >= 0;
-            var hasNetworkConfig = _audioTriggerService.NetworkTriggerPort > 0;
-
-            if (!hasAudioConfig && !hasNetworkConfig)
-            {
-                // No configuration - open dialog to configure
-                ShotListView.ShotTriggerToggleControl.IsChecked = false;
-                ShotTriggerConfigButton_Click(sender, e);
-                return;
-            }
-
-            // Check if Npcap is installed
-            if (!GSProTrafficMonitor.IsNpcapInstalled())
-            {
-                ShotListView.ShotTriggerToggleControl.IsChecked = false;
-                MessageDialog.Show(
-                    this,
-                    "Npcap Required",
-                    "Shot triggers require Npcap for real-time detection.\n\n" +
-                    "Please download and install Npcap from:\nhttps://npcap.com/\n\n" +
-                    "After installing, restart Sim Logger.",
-                    MessageDialogType.Warning);
-                return;
-            }
-
-            // Enable real-time detection
-            _audioTriggerService.RealtimeDetectionEnabled = true;
-        }
-        else
-        {
-            // Disable everything
-            _audioTriggerService.IsEnabled = false;
-            _audioTriggerService.NetworkTriggerEnabled = false;
-            _audioTriggerService.RealtimeDetectionEnabled = false;
-            _networkTriggerService.IsEnabled = false;
-        }
-
-        _audioTriggerService.SaveSettings();
-        UpdateShotTriggerLabel();
-
-        if (isEnabled)
-        {
-            MessageDialog.Show(
-                this,
-                "Restart Required",
-                "Shot trigger has been enabled.\n\nPlease restart Sim Logger for changes to take effect.",
-                MessageDialogType.Information);
-        }
-    }
-
-    private void ShotTriggerConfigButton_Click(object? sender, RoutedEventArgs e)
-    {
-        var dialog = new ShotTriggerDialog(
-            _audioTriggerService,
-            _networkTriggerService,
-            _audioTriggerService.IsEnabled,
-            _audioTriggerService.NetworkTriggerEnabled,
-            _audioTriggerService.NetworkTriggerPort,
-            _audioTriggerService.NetworkTriggerHost,
-            _audioTriggerService.GSProApiPort)
-        {
-            Owner = this
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            // Save audio settings
-            if (dialog.UseAudioTrigger && dialog.SelectedAudioDevice != null)
-            {
-                _audioTriggerService.SelectedDeviceIndex = dialog.SelectedAudioDevice.Index;
-                _audioTriggerService.SelectedDeviceName = dialog.SelectedAudioDevice.Name;
-                _audioTriggerService.IsEnabled = true;
-                _audioTriggerService.NetworkTriggerEnabled = false;
-                _networkTriggerService.IsEnabled = false;
-
-                // Save tone parameters
-                _audioTriggerService.ToneFrequencyHz = dialog.ToneFrequencyHz;
-                _audioTriggerService.ToneNoiseDecay = dialog.ToneNoiseDecay;
-                _audioTriggerService.ToneToneDecay = dialog.ToneToneDecay;
-                _audioTriggerService.ToneMix = dialog.ToneMix;
-                _audioTriggerService.ToneDurationMs = dialog.ToneDurationMs;
-            }
-            // Save network settings
-            else if (dialog.UseNetworkTrigger)
-            {
-                _audioTriggerService.NetworkTriggerPort = dialog.NetworkPort;
-                _audioTriggerService.NetworkTriggerHost = dialog.NetworkHost;
-                _audioTriggerService.NetworkTriggerEnabled = true;
-                _audioTriggerService.IsEnabled = false;
-                _networkTriggerService.Port = dialog.NetworkPort;
-                _networkTriggerService.TargetHost = dialog.NetworkHost;
-                _networkTriggerService.IsEnabled = true;
-            }
-
-            // Save realtime port
-            _audioTriggerService.GSProApiPort = dialog.RealtimePort;
-            _audioTriggerService.RealtimeDetectionEnabled = true;
-            _audioTriggerService.SaveSettings();
-
-            // Enable the toggle
-            ShotListView.ShotTriggerToggleControl.IsChecked = true;
-            UpdateShotTriggerLabel();
-
-            MessageDialog.Show(
-                this,
-                "Restart Required",
-                "Shot trigger has been configured.\n\nPlease restart Sim Logger for changes to take effect.",
-                MessageDialogType.Information);
-        }
-    }
-
-    private void UpdateShotTriggerLabel()
-    {
-        if (_audioTriggerService.IsEnabled)
-        {
-            ShotListView.ShotTriggerLabelControl.Text = "Shot Trigger (Audio)";
-            ShotListView.SetShotTriggerTooltip(true, _audioTriggerService.SelectedDeviceName);
-        }
-        else if (_audioTriggerService.NetworkTriggerEnabled)
-        {
-            ShotListView.ShotTriggerLabelControl.Text = "Shot Trigger (Network)";
-            ShotListView.SetShotTriggerTooltip(false, $"{_audioTriggerService.NetworkTriggerHost}:{_audioTriggerService.NetworkTriggerPort}");
-        }
-        else
-        {
-            ShotListView.ShotTriggerLabelControl.Text = "Shot Trigger";
-            ShotListView.SetShotTriggerTooltip(true, null);
-        }
-    }
-
     private void DataStorageButton_Click(object? sender, RoutedEventArgs e)
     {
-        var dialog = new DataStorageDialog(_audioTriggerService.DataStoragePath)
+        var dialog = new DataStorageDialog(_settingsService.DataStoragePath)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() == true)
         {
-            var oldPath = _audioTriggerService.DataStoragePath;
+            var oldPath = _settingsService.DataStoragePath;
             var newPath = dialog.SelectedPath;
 
-            // Only process if path actually changed
             if (oldPath != newPath)
             {
-                _audioTriggerService.DataStoragePath = newPath;
-                _audioTriggerService.SaveSettings();
+                _settingsService.DataStoragePath = newPath;
+                _settingsService.SaveSettings();
                 ShotListView.SetDataStorageTooltip(newPath);
 
-                // Notify user that restart is required for changes to take effect
                 MessageDialog.Show(
                     this,
                     "Restart Required",
@@ -646,24 +451,22 @@ public partial class MainWindow : Window
 
     private void GSProPathButton_Click(object? sender, RoutedEventArgs e)
     {
-        var dialog = new GSProPathDialog(_audioTriggerService.GSProPath)
+        var dialog = new GSProPathDialog(_settingsService.GSProPath)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() == true)
         {
-            var oldPath = _audioTriggerService.GSProPath;
+            var oldPath = _settingsService.GSProPath;
             var newPath = dialog.SelectedPath;
 
-            // Only process if path actually changed
             if (oldPath != newPath)
             {
-                _audioTriggerService.GSProPath = newPath;
-                _audioTriggerService.SaveSettings();
+                _settingsService.GSProPath = newPath;
+                _settingsService.SaveSettings();
                 ShotListView.SetGSProPathTooltip(newPath);
 
-                // Notify user that restart is required for changes to take effect
                 MessageDialog.Show(
                     this,
                     "Restart Required",
@@ -681,12 +484,12 @@ public partial class MainWindow : Window
 
         if (selectedShots.Count > 0)
         {
-            ShotListView.ExportCsvButtonControl.Content = "Export Selected";
+            ShotListView.ExportCsvButtonControl.ToolTip = "Export selected shots to CSV";
             ShotListView.ExportCsvButtonControl.IsEnabled = true;
         }
         else
         {
-            ShotListView.ExportCsvButtonControl.Content = "Export All";
+            ShotListView.ExportCsvButtonControl.ToolTip = "Export all shots to CSV";
             ShotListView.ExportCsvButtonControl.IsEnabled = hasShots;
         }
     }
@@ -695,19 +498,14 @@ public partial class MainWindow : Window
     {
         var selectedShots = _shotListViewModel.SelectedShots;
         List<ShotData> shotsToExport;
-        string exportType;
 
         if (selectedShots.Count > 0)
         {
-            // Export selected shots
             shotsToExport = selectedShots.ToList();
-            exportType = "selected";
         }
         else
         {
-            // Export all visible shots (button only enabled when filter is "Synced")
             shotsToExport = _shotListViewModel.Shots.ToList();
-            exportType = "synced";
         }
 
         if (shotsToExport.Count == 0)
@@ -716,7 +514,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Show format selection dialog
         var formatDialog = new ExportFormatDialog { Owner = this };
         if (formatDialog.ShowDialog() != true)
         {
@@ -742,53 +539,104 @@ public partial class MainWindow : Window
             if (selectedFormat == ExportFormat.ShotPattern)
             {
                 ShotDataExporter.ExportToShotPatternCsv(shotsToExport, dialog.FileName, silent: true);
-                ShotListView.StatusTextControl.Text = $"Exported {shotsToExport.Count} {exportType} shot{(shotsToExport.Count != 1 ? "s" : "")} to Shot Pattern CSV";
             }
             else
             {
                 ShotDataExporter.ExportToGSProCsv(shotsToExport, dialog.FileName, silent: true);
-                ShotListView.StatusTextControl.Text = $"Exported {shotsToExport.Count} {exportType} shot{(shotsToExport.Count != 1 ? "s" : "")} to GSPro CSV";
             }
         }
     }
 
+    private async void ImportCsvButton_Click(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "CSV files (*.csv)|*.csv",
+            DefaultExt = ".csv",
+            Title = "Import GSPro CSV"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var importResult = ShotDataImporter.ImportFromGSProCsv(dialog.FileName);
+
+        if (importResult.Shots.Count == 0)
+        {
+            var errorMsg = importResult.Errors.Count > 0
+                ? string.Join("\n", importResult.Errors)
+                : "No shots found in file.";
+            MessageDialog.Show(this, "Import Failed", errorMsg, MessageDialogType.Error);
+            return;
+        }
+
+        // Deduplicate against existing shots
+        var existingNames = await _shotDataService.Repository.GetSyncedDirectoryNamesAsync();
+        var existingSet = new HashSet<string>(existingNames);
+        var newShots = importResult.Shots.Where(s => !existingSet.Contains(s.DirectoryName)).ToList();
+        int duplicateCount = importResult.Shots.Count - newShots.Count;
+
+        if (newShots.Count == 0)
+        {
+            MessageDialog.Show(this, "Import",
+                "All shots in this file have already been imported.", MessageDialogType.Information);
+            return;
+        }
+
+        // Insert into database
+        int imported = 0;
+        var dbErrors = new List<string>();
+
+        foreach (var shot in newShots)
+        {
+            try
+            {
+                await _shotDataService.Repository.InsertShotAsync(shot);
+                imported++;
+            }
+            catch (Exception ex)
+            {
+                dbErrors.Add($"Shot {shot.ShotNumber}: {ex.Message}");
+            }
+        }
+
+        // Refresh
+        _shotDataService.ClearCache();
+        await LoadShotsAsync();
+
+        // Show results
+        var message = $"Imported {imported} shot(s) from CSV.";
+        if (duplicateCount > 0)
+            message += $"\n{duplicateCount} duplicate(s) skipped.";
+        if (importResult.SkippedRows > 0)
+            message += $"\n{importResult.SkippedRows} row(s) skipped due to parse errors.";
+        if (dbErrors.Count > 0)
+            message += $"\n{dbErrors.Count} database error(s).";
+
+        MessageDialog.Show(this, "Import Complete", message, MessageDialogType.Information);
+    }
+
     private async Task AutoSyncShotAsync(ShotData shot)
     {
-        ShotListView.StatusTextControl.Text = "Syncing new shot...";
-
         try
         {
             var result = await Task.Run(() => _syncService.SyncAsync(new[] { shot }, CancellationToken.None));
 
             if (result.Success && result.ShotsProcessed > 0)
             {
-                ShotListView.StatusTextControl.Text = $"Synced: {result.ShotsProcessed} shot(s)";
+                _shotDataService.ClearCache();
+                await LoadShotsAsync();
             }
-            else if (result.ShotsProcessed == 0)
-            {
-                ShotListView.StatusTextControl.Text = "Shot already synced";
-            }
-            else
-            {
-                ShotListView.StatusTextControl.Text = $"Sync error: {string.Join(", ", result.Errors)}";
-            }
-
-            // Refresh to show updated sync status
-            _shotDataService.ClearCache();
-            await LoadShotsAsync();
         }
         catch (Exception ex)
         {
-            ShotListView.StatusTextControl.Text = $"Sync failed: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Auto-sync failed: {ex.Message}");
         }
     }
 
     protected override void OnClosed(EventArgs e)
     {
         _fileWatcher.Dispose();
-        _trafficMonitor?.Dispose();
-        _audioTriggerService.Dispose();
-        _networkTriggerService.Dispose();
         base.OnClosed(e);
     }
 }

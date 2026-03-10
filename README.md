@@ -7,8 +7,12 @@ A Windows desktop application for viewing and exporting golf shot data from [GSP
 ## Features
 
 ### Shot Management
-
+- **Automatic Import** - When sim-logger is running, shots from the GSPro Driving Range will be automatically imported.
 - **Shot list view** - Browse all shots with club, ball speed, carry distance, etc.
+- **Shot Tagging** - User defined tags that can be applied to a single shot or multiple (right click on selected shot(s))
+- **Shot Deletion** - Select and delete single or multiple shots (right click on selected shot(s))
+
+
 
 ### Inport/Export
 - **CSV import** - Import CSV exports from GSPro for analysis

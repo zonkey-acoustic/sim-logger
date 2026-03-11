@@ -58,7 +58,8 @@
                   CanUserReorderColumns="True"
                   CanUserSortColumns="True"
                   HeadersVisibility="Column"
-                  ColumnWidth="SizeToCells">
+                  ColumnWidth="SizeToCells"
+                  LoadingRow="ShotDataGrid_LoadingRow">
 
             <DataGrid.ContextMenu>
                 <ContextMenu>
@@ -86,7 +87,15 @@
 
             <DataGrid.Columns>
                 <!-- Selection checkbox -->
-                <DataGridTemplateColumn Header="Sel" Width="Auto" CanUserReorder="False">
+                <DataGridTemplateColumn Width="Auto" CanUserReorder="False" CanUserSort="False">
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <CheckBox x:Name="SelectAllCheckBox"
+                                      Click="SelectAllCheckBox_Click"
+                                      HorizontalAlignment="Center"
+                                      ToolTip="Select all on this page"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <CheckBox Click="SelectionCheckBox_Click"

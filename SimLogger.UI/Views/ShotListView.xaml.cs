@@ -2,7 +2,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using SimLogger.Core.Models;
@@ -328,7 +328,39 @@ public partial class ShotListView : UserControl
         {
             // Collection was cleared - uncheck all checkboxes
             UpdateAllCheckboxes(false);
+            UpdateSelectAllCheckbox();
         }
+        else
+        {
+            UpdateSelectAllCheckbox();
+        }
+    }
+
+    private void UpdateSelectAllCheckbox()
+    {
+        var headerCheckBox = FindColumnHeaderCheckBox();
+        if (headerCheckBox == null) return;
+
+        if (DataContext is ShotListViewModel vm && vm.Shots.Count > 0)
+        {
+            bool allSelected = vm.Shots.All(s => vm.SelectedShots.Contains(s));
+            headerCheckBox.IsChecked = allSelected;
+        }
+        else
+        {
+            headerCheckBox.IsChecked = false;
+        }
+    }
+
+    private CheckBox? FindColumnHeaderCheckBox()
+    {
+        // Find the header presenter for the first column (selection column)
+        var headerPresenter = FindVisualChild<DataGridColumnHeadersPresenter>(ShotDataGrid);
+        if (headerPresenter != null)
+        {
+            return FindVisualChild<CheckBox>(headerPresenter);
+        }
+        return null;
     }
 
     private void UpdateAllCheckboxes(bool isChecked)
@@ -364,6 +396,51 @@ public partial class ShotListView : UserControl
             }
         }
         return null;
+    }
+
+    private void SelectAllCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox checkBox && DataContext is ShotListViewModel vm)
+        {
+            if (checkBox.IsChecked == true)
+            {
+                // Select all shots on the current page
+                foreach (var shot in vm.Shots)
+                {
+                    if (!vm.SelectedShots.Contains(shot))
+                    {
+                        vm.SelectedShots.Add(shot);
+                    }
+                }
+            }
+            else
+            {
+                // Deselect all shots on the current page
+                foreach (var shot in vm.Shots.ToList())
+                {
+                    vm.SelectedShots.Remove(shot);
+                }
+            }
+
+            // Update all visible row checkboxes
+            UpdateAllCheckboxes(checkBox.IsChecked == true);
+        }
+    }
+
+    private void ShotDataGrid_LoadingRow(object sender, DataGridRowEventArgs e)
+    {
+        if (e.Row.Item is ShotData shot && DataContext is ShotListViewModel vm)
+        {
+            // Defer to allow the visual tree to be fully built for recycled rows
+            Dispatcher.BeginInvoke(() =>
+            {
+                var checkbox = FindVisualChild<CheckBox>(e.Row);
+                if (checkbox != null)
+                {
+                    checkbox.IsChecked = vm.SelectedShots.Contains(shot);
+                }
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+        }
     }
 
     private void SelectionCheckBox_Click(object sender, RoutedEventArgs e)

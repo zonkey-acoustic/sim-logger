@@ -33,18 +33,33 @@ public class DatabaseContext : IDisposable
         DataDirectory = simLoggerDirectory;
 
         _databasePath = Path.Combine(simLoggerDirectory, "simlogger.db");
-        _connectionString = $"Data Source={_databasePath}";
+        _connectionString = $"Data Source={_databasePath};Cache=Shared";
     }
 
     public SqliteConnection CreateConnection()
     {
-        return new SqliteConnection(_connectionString);
+        var connection = new SqliteConnection(_connectionString);
+        connection.StateChange += (s, e) =>
+        {
+            if (e.CurrentState == System.Data.ConnectionState.Open)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "PRAGMA busy_timeout=5000;";
+                cmd.ExecuteNonQuery();
+            }
+        };
+        return connection;
     }
 
     public async Task InitializeDatabaseAsync()
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync();
+
+        // Enable WAL mode for better concurrent read/write performance
+        var walCommand = connection.CreateCommand();
+        walCommand.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
+        await walCommand.ExecuteNonQueryAsync();
 
         var createTablesCommand = connection.CreateCommand();
         createTablesCommand.CommandText = GetCreateTablesSql();

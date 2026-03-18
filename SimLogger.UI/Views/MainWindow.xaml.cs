@@ -196,17 +196,25 @@ public partial class MainWindow : Window
     private async void DeleteShots_Requested(object? sender, List<ShotData> shots)
     {
         var syncedShots = shots.Where(s => s.IsSynced).ToList();
+        var unsyncedCount = shots.Count - syncedShots.Count;
+
         if (syncedShots.Count == 0)
         {
             MessageDialog.Show(this, "Delete Shots",
-                "Only synced shots can be deleted from the database.",
+                $"The selected {(unsyncedCount == 1 ? "shot has" : "shots have")} not been synced to the database yet. Sync first, then delete.",
                 MessageDialogType.Information);
             return;
         }
 
         var shotWord = syncedShots.Count == 1 ? "shot" : "shots";
+        var message = $"Are you sure you want to delete {syncedShots.Count} {shotWord} from the database?\n\nThis action cannot be undone.";
+        if (unsyncedCount > 0)
+        {
+            message += $"\n\n({unsyncedCount} unsynced {(unsyncedCount == 1 ? "shot" : "shots")} will be skipped)";
+        }
+
         var confirmed = MessageDialog.Confirm(this, "Delete Shots",
-            $"Are you sure you want to delete {syncedShots.Count} {shotWord} from the database?\n\nThis action cannot be undone.",
+            message,
             MessageDialogType.Warning);
 
         if (!confirmed)
@@ -638,5 +646,6 @@ public partial class MainWindow : Window
     {
         _fileWatcher.Dispose();
         base.OnClosed(e);
+        Environment.Exit(0);
     }
 }
